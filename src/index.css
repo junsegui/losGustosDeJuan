@@ -1,0 +1,12 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "DM Sans", sans-serif;
+  background: #faf7f2;
+  color: #1a1208;
+  -webkit-font-smoothing: antialiased;
+}
