@@ -1,10 +1,15 @@
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import styled from "styled-components";
 import Dashboard from "./pages/Dashboard";
-import Productos from "./pages/Productos";
+import Insumos from "./pages/Insumos";
 import Ferias from "./pages/Ferias";
 import Gastos from "./pages/Gastos";
-import Producciones from "./pages/Producciones";
+import SubRecetas from "./pages/SubRecetas";
+import Carta from "./pages/Carta";
+import Recetas from "./pages/Recetas";
+import CalculadoraExpress from "./components/CalculadoraExpress";
+import BusquedaGlobal from "./components/BusquedaGlobal";
+import Reportes from "./pages/Reportes";
 
 const Layout = styled.div`
   min-height: 100vh;
@@ -53,7 +58,7 @@ const NavItem = styled(NavLink)`
 const Content = styled.main`
   flex: 1;
   padding: 32px;
-  max-width: 1000px;
+  max-width: 1200px;
   width: 100%;
   margin: 0 auto;
 `;
@@ -63,22 +68,30 @@ function App() {
     <BrowserRouter>
       <Layout>
         <Nav>
-          <Logo>🥩 Los Gustos De Juan</Logo>
+          <Logo>🥩 Feria Manager</Logo>
+          <BusquedaGlobal />
           <NavItem to="/">Resumen</NavItem>
-          <NavItem to="/productos">Productos</NavItem>
+          <NavItem to="/insumos">Insumos</NavItem>
           <NavItem to="/ferias">Ferias</NavItem>
+          <NavItem to="/carta">Carta</NavItem>
           <NavItem to="/gastos">Gastos</NavItem>
-          <NavItem to="/producciones">Producciones</NavItem>
+          <NavItem to="/sub-recetas">Sub-recetas</NavItem>
+          <NavItem to="/recetas">Recetas</NavItem>
+          <NavItem to="/reportes">Reportes</NavItem>
         </Nav>
         <Content>
           <Routes>
-            <Route path="/producciones" element={<Producciones />} />
             <Route path="/" element={<Dashboard />} />
-            <Route path="/productos" element={<Productos />} />
+            <Route path="/sub-recetas" element={<SubRecetas />} />
+            <Route path="/insumos" element={<Insumos />} />
             <Route path="/ferias" element={<Ferias />} />
+            <Route path="/carta" element={<Carta />} />
             <Route path="/gastos" element={<Gastos />} />
+            <Route path="/recetas" element={<Recetas />} />
+            <Route path="/reportes" element={<Reportes />} />
           </Routes>
         </Content>
+        <CalculadoraExpress />
       </Layout>
     </BrowserRouter>
   );

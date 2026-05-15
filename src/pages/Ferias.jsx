@@ -246,11 +246,10 @@ const RemoveBtn = styled.button`
 
 function Ferias() {
   const [ferias, setFerias] = useState([]);
-  const [productos, setProductos] = useState([]);
+  const [carta, setCarta] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mostrarForm, setMostrarForm] = useState(false);
 
-  // Form de la feria
   const [form, setForm] = useState({
     nombre: "",
     fecha: new Date().toISOString().split("T")[0],
@@ -258,10 +257,7 @@ function Ferias() {
     notas: "",
   });
 
-  // Ventas del día
   const [ventas, setVentas] = useState([]);
-
-  // Costos del día
   const [costos, setCostos] = useState([]);
 
   useEffect(() => {
@@ -270,20 +266,24 @@ function Ferias() {
 
   async function fetchTodo() {
     setLoading(true);
-    const [{ data: prods }, { data: feriasData }] = await Promise.all([
-      supabase.from("productos").select("*").order("nombre"),
+    const [{ data: cartaData }, { data: feriasData }] = await Promise.all([
+      supabase
+        .from("carta")
+        .select("*, recetas(*)")
+        .eq("activo", true)
+        .order("nombre_comercial"),
       supabase
         .from("ferias")
         .select(
           `
         *,
-        ventas(*, productos(nombre, tipo)),
+        ventas_feria(*, carta(nombre_comercial, recetas(costo_por_porcion))),
         costos_feria(*)
       `,
         )
         .order("fecha", { ascending: false }),
     ]);
-    if (prods) setProductos(prods);
+    if (cartaData) setCarta(cartaData);
     if (feriasData) setFerias(feriasData);
     setLoading(false);
   }
@@ -291,7 +291,7 @@ function Ferias() {
   function addVenta() {
     setVentas([
       ...ventas,
-      { producto_id: "", cantidad: "", precio_venta_real: "" },
+      { carta_id: "", cantidad: "", precio_venta_real: "" },
     ]);
   }
 
@@ -322,7 +322,6 @@ function Ferias() {
   async function guardarFeria() {
     if (!form.nombre.trim()) return alert("El nombre es obligatorio");
 
-    // 1. Guardar la feria
     const { data: feriaCreada, error } = await supabase
       .from("ferias")
       .insert({
@@ -338,20 +337,18 @@ function Ferias() {
 
     const feriaId = feriaCreada.id;
 
-    // 2. Guardar ventas
-    const ventasValidas = ventas.filter((v) => v.producto_id && v.cantidad);
+    const ventasValidas = ventas.filter((v) => v.carta_id && v.cantidad);
     if (ventasValidas.length > 0) {
-      await supabase.from("ventas").insert(
+      await supabase.from("ventas_feria").insert(
         ventasValidas.map((v) => ({
           feria_id: feriaId,
-          producto_id: v.producto_id,
+          carta_id: v.carta_id,
           cantidad: parseFloat(v.cantidad),
           precio_venta_real: parseFloat(v.precio_venta_real) || 0,
         })),
       );
     }
 
-    // 3. Guardar costos
     const costosValidos = costos.filter((c) => c.descripcion && c.monto);
     if (costosValidos.length > 0) {
       await supabase.from("costos_feria").insert(
@@ -363,7 +360,6 @@ function Ferias() {
       );
     }
 
-    // Resetear
     setForm({
       nombre: "",
       fecha: new Date().toISOString().split("T")[0],
@@ -383,7 +379,7 @@ function Ferias() {
   }
 
   function calcularResumen(feria) {
-    const ingresos = (feria.ventas || []).reduce(
+    const ingresos = (feria.ventas_feria || []).reduce(
       (s, v) => s + v.cantidad * v.precio_venta_real,
       0,
     );
@@ -439,18 +435,17 @@ function Ferias() {
             </FormGroup>
           </Grid>
 
-          {/* Ventas */}
           <SubTitle>🥖 Lo que vendiste</SubTitle>
           {ventas.map((v, i) => (
             <ItemRow key={i}>
               <Select
-                value={v.producto_id}
-                onChange={(e) => updateVenta(i, "producto_id", e.target.value)}
+                value={v.carta_id}
+                onChange={(e) => updateVenta(i, "carta_id", e.target.value)}
               >
-                <option value="">Seleccioná producto...</option>
-                {productos.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.nombre}
+                <option value="">Seleccionar producto...</option>
+                {carta.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre_comercial}
                   </option>
                 ))}
               </Select>
@@ -478,7 +473,6 @@ function Ferias() {
             + Agregar venta
           </ButtonSecondary>
 
-          {/* Costos del día */}
           <SubTitle>💸 Costos del día</SubTitle>
           {costos.map((c, i) => (
             <ItemRow key={i} style={{ gridTemplateColumns: "1fr 120px 28px" }}>

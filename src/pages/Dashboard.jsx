@@ -84,7 +84,7 @@ const CardTitle = styled.div`
   border-bottom: 1px solid ${(p) => p.theme.colors.border};
 `;
 
-const FeriaRow = styled.div`
+const ItemRow = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -96,50 +96,28 @@ const FeriaRow = styled.div`
   }
 `;
 
-const FeriaNombre = styled.div`
+const ItemNombre = styled.div`
   font-weight: 600;
   font-size: 14px;
 `;
 
-const FeriaFecha = styled.div`
+const ItemDetalle = styled.div`
   font-size: 12px;
   color: ${(p) => p.theme.colors.textMuted};
   margin-top: 2px;
 `;
 
-const FeriaGanancia = styled.div`
+const ItemValue = styled.div`
   font-weight: 700;
   font-size: 15px;
-  color: ${(p) => (p.green ? p.theme.colors.success : p.theme.colors.danger)};
-`;
-
-const ProductoRow = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid ${(p) => p.theme.colors.border};
-
-  &:last-child {
-    border-bottom: none;
-  }
-`;
-
-const ProductoNombre = styled.div`
-  font-weight: 600;
-  font-size: 14px;
-`;
-
-const ProductoTipo = styled.div`
-  font-size: 12px;
-  color: ${(p) => p.theme.colors.textMuted};
-  margin-top: 2px;
-`;
-
-const ProductoPrecio = styled.div`
-  font-weight: 700;
-  font-size: 15px;
-  color: ${(p) => p.theme.colors.primary};
+  color: ${(p) =>
+    p.green
+      ? p.theme.colors.success
+      : p.red
+        ? p.theme.colors.danger
+        : p.highlight
+          ? p.theme.colors.primary
+          : p.theme.colors.text};
 `;
 
 const Empty = styled.div`
@@ -149,32 +127,40 @@ const Empty = styled.div`
   font-size: 13px;
 `;
 
-const GastoRow = styled.div`
+const Alert = styled.div`
+  background: ${(p) => p.theme.colors.dangerLight};
+  border: 1px solid ${(p) => p.theme.colors.danger}33;
+  border-radius: ${(p) => p.theme.radii.md};
+  padding: 16px 20px;
+  margin-bottom: 20px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid ${(p) => p.theme.colors.border};
-
-  &:last-child {
-    border-bottom: none;
-  }
+  gap: 12px;
 `;
 
-const GastoDesc = styled.div`
+const AlertIcon = styled.div`
+  font-size: 20px;
+`;
+
+const AlertText = styled.div`
+  flex: 1;
   font-size: 14px;
+  color: ${(p) => p.theme.colors.danger};
   font-weight: 500;
 `;
 
-const GastoMonto = styled.div`
-  font-weight: 700;
-  font-size: 14px;
-  color: ${(p) => p.theme.colors.danger};
-`;
-
 function Dashboard() {
+  const [stats, setStats] = useState({
+    insumos: 0,
+    subRecetas: 0,
+    recetas: 0,
+    carta: 0,
+    ferias: 0,
+    totalGanancias: 0,
+    totalGastos: 0,
+  });
   const [ferias, setFerias] = useState([]);
-  const [productos, setProductos] = useState([]);
+  const [carta, setCarta] = useState([]);
   const [gastos, setGastos] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -184,26 +170,33 @@ function Dashboard() {
 
   async function fetchTodo() {
     setLoading(true);
+
     const [
+      { data: insumosData },
+      { data: subRecetasData },
+      { data: recetasData },
+      { data: cartaData },
       { data: feriasData },
-      { data: productosData },
       { data: gastosData },
     ] = await Promise.all([
+      supabase.from("insumos").select("id"),
+      supabase.from("sub_recetas").select("id"),
+      supabase.from("recetas").select("id"),
+      supabase
+        .from("carta")
+        .select("*, recetas(costo_por_porcion)")
+        .eq("activo", true),
       supabase
         .from("ferias")
         .select(
           `
         *,
-        ventas(*),
+        ventas_feria(*),
         costos_feria(*)
       `,
         )
         .order("fecha", { ascending: false })
         .limit(5),
-      supabase
-        .from("productos")
-        .select("*")
-        .order("created_at", { ascending: false }),
       supabase
         .from("gastos")
         .select("*")
@@ -211,14 +204,35 @@ function Dashboard() {
         .limit(5),
     ]);
 
-    if (feriasData) setFerias(feriasData);
-    if (productosData) setProductos(productosData);
-    if (gastosData) setGastos(gastosData);
+    const totalGanancias = (feriasData || []).reduce((sum, f) => {
+      const ingresos = (f.ventas_feria || []).reduce(
+        (s, v) => s + v.cantidad * v.precio_venta_real,
+        0,
+      );
+      const costos = (f.costos_feria || []).reduce((s, c) => s + c.monto, 0);
+      return sum + (ingresos - costos);
+    }, 0);
+
+    const totalGastos = (gastosData || []).reduce((sum, g) => sum + g.monto, 0);
+
+    setStats({
+      insumos: insumosData?.length || 0,
+      subRecetas: subRecetasData?.length || 0,
+      recetas: recetasData?.length || 0,
+      carta: cartaData?.length || 0,
+      ferias: feriasData?.length || 0,
+      totalGanancias,
+      totalGastos,
+    });
+
+    setFerias(feriasData || []);
+    setCarta(cartaData || []);
+    setGastos(gastosData || []);
     setLoading(false);
   }
 
   function calcularGananciaFeria(feria) {
-    const ingresos = (feria.ventas || []).reduce(
+    const ingresos = (feria.ventas_feria || []).reduce(
       (s, v) => s + v.cantidad * v.precio_venta_real,
       0,
     );
@@ -226,13 +240,7 @@ function Dashboard() {
     return ingresos - costos;
   }
 
-  const totalGanancias = ferias.reduce(
-    (s, f) => s + calcularGananciaFeria(f),
-    0,
-  );
-  const totalGastos = gastos.reduce((s, g) => s + g.monto, 0);
-  const totalFerias = ferias.length;
-  const totalProductos = productos.length;
+  const productosMargenBajo = carta.filter((c) => c.cmv > 70);
 
   if (loading) return <Empty>Cargando...</Empty>;
 
@@ -241,22 +249,33 @@ function Dashboard() {
       <Title>Bienvenido 👋</Title>
       <Subtitle>Un resumen rápido de tu negocio.</Subtitle>
 
+      {productosMargenBajo.length > 0 && (
+        <Alert>
+          <AlertIcon>⚠️</AlertIcon>
+          <AlertText>
+            Tenés {productosMargenBajo.length} producto
+            {productosMargenBajo.length > 1 ? "s" : ""} con margen muy bajo (CMV
+            &gt; 70%). Revisá los precios en la Carta.
+          </AlertText>
+        </Alert>
+      )}
+
       <StatGrid>
         <StatCard>
-          <StatLabel>Productos</StatLabel>
-          <StatValue>{totalProductos}</StatValue>
+          <StatLabel>Insumos</StatLabel>
+          <StatValue>{stats.insumos}</StatValue>
         </StatCard>
         <StatCard>
-          <StatLabel>Ferias</StatLabel>
-          <StatValue>{totalFerias}</StatValue>
+          <StatLabel>Productos en carta</StatLabel>
+          <StatValue>{stats.carta}</StatValue>
         </StatCard>
         <StatCard green>
           <StatLabel>Ganancias ferias</StatLabel>
-          <StatValue green>{formatPrecio(totalGanancias)}</StatValue>
+          <StatValue green>{formatPrecio(stats.totalGanancias)}</StatValue>
         </StatCard>
         <StatCard red>
           <StatLabel>Gastos generales</StatLabel>
-          <StatValue red>{formatPrecio(totalGastos)}</StatValue>
+          <StatValue red>{formatPrecio(stats.totalGastos)}</StatValue>
         </StatCard>
       </StatGrid>
 
@@ -267,39 +286,35 @@ function Dashboard() {
           {ferias.map((f) => {
             const ganancia = calcularGananciaFeria(f);
             return (
-              <FeriaRow key={f.id}>
+              <ItemRow key={f.id}>
                 <div>
-                  <FeriaNombre>{f.nombre}</FeriaNombre>
-                  <FeriaFecha>
+                  <ItemNombre>{f.nombre}</ItemNombre>
+                  <ItemDetalle>
                     {f.fecha}
                     {f.lugar ? ` · ${f.lugar}` : ""}
-                  </FeriaFecha>
+                  </ItemDetalle>
                 </div>
-                <FeriaGanancia green={ganancia > 0}>
+                <ItemValue green={ganancia > 0} red={ganancia < 0}>
                   {formatPrecio(ganancia)}
-                </FeriaGanancia>
-              </FeriaRow>
+                </ItemValue>
+              </ItemRow>
             );
           })}
         </Card>
 
         <Card>
-          <CardTitle>📦 Mis productos</CardTitle>
-          {productos.length === 0 && <Empty>No hay productos cargados</Empty>}
-          {productos.slice(0, 5).map((p) => (
-            <ProductoRow key={p.id}>
+          <CardTitle>📋 Productos en carta</CardTitle>
+          {carta.length === 0 && <Empty>No hay productos en la carta</Empty>}
+          {carta.slice(0, 5).map((c) => (
+            <ItemRow key={c.id}>
               <div>
-                <ProductoNombre>{p.nombre}</ProductoNombre>
-                <ProductoTipo>
-                  {p.tipo === "pieza" ? "🍖 Pieza" : "🥖 Sanguche"}
-                </ProductoTipo>
+                <ItemNombre>{c.nombre_comercial}</ItemNombre>
+                <ItemDetalle>
+                  CMV: {c.cmv?.toFixed(1)}% · CTM: {c.ctm?.toFixed(1)}%
+                </ItemDetalle>
               </div>
-              <ProductoPrecio>
-                {p.precio_venta
-                  ? `${formatPrecio(p.precio_venta)}${p.tipo === "pieza" ? "/kg" : " c/u"}`
-                  : "—"}
-              </ProductoPrecio>
-            </ProductoRow>
+              <ItemValue highlight>{formatPrecio(c.precio_venta)}</ItemValue>
+            </ItemRow>
           ))}
         </Card>
       </Grid2>
@@ -308,15 +323,15 @@ function Dashboard() {
         <CardTitle>💸 Últimos gastos</CardTitle>
         {gastos.length === 0 && <Empty>No hay gastos registrados</Empty>}
         {gastos.map((g) => (
-          <GastoRow key={g.id}>
-            <GastoDesc>
-              {g.descripcion} ·{" "}
-              <span style={{ color: "#B5A899", fontSize: 12 }}>
-                {g.categoria}
-              </span>
-            </GastoDesc>
-            <GastoMonto>{formatPrecio(g.monto)}</GastoMonto>
-          </GastoRow>
+          <ItemRow key={g.id}>
+            <div>
+              <ItemNombre>{g.descripcion}</ItemNombre>
+              <ItemDetalle>
+                {g.categoria} · {g.fecha}
+              </ItemDetalle>
+            </div>
+            <ItemValue red>{formatPrecio(g.monto)}</ItemValue>
+          </ItemRow>
         ))}
       </Card>
     </div>
