@@ -10,7 +10,7 @@ import Recetas from "./pages/Recetas";
 import CalculadoraExpress from "./components/CalculadoraExpress";
 import BusquedaGlobal from "./components/BusquedaGlobal";
 import Reportes from "./pages/Reportes";
-
+import AnalisisPorLugar from "./pages/AnalisisPorLugar";
 const Layout = styled.div`
   min-height: 100vh;
   display: flex;
@@ -71,18 +71,20 @@ function App() {
           <Logo>🥩 Feria Manager</Logo>
           <BusquedaGlobal />
           <NavItem to="/">Resumen</NavItem>
-          <NavItem to="/insumos">Insumos</NavItem>
-          <NavItem to="/ferias">Ferias</NavItem>
-          <NavItem to="/carta">Carta</NavItem>
-          <NavItem to="/gastos">Gastos</NavItem>
+          <NavItem to="/insumos">Insumos</NavItem>{" "}
           <NavItem to="/sub-recetas">Sub-recetas</NavItem>
           <NavItem to="/recetas">Recetas</NavItem>
+          <NavItem to="/carta">Carta</NavItem>
+          <NavItem to="/ferias">Ferias</NavItem>
+          <NavItem to="/gastos">Gastos</NavItem>
           <NavItem to="/reportes">Reportes</NavItem>
+          <NavItem to="/analisis-lugar">Análisis por Lugar</NavItem>
         </Nav>
         <Content>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/sub-recetas" element={<SubRecetas />} />
+            <Route path="/analisis-lugar" element={<AnalisisPorLugar />} />
             <Route path="/insumos" element={<Insumos />} />
             <Route path="/ferias" element={<Ferias />} />
             <Route path="/carta" element={<Carta />} />

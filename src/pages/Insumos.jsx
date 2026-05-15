@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import styled from "styled-components";
 import { supabase } from "../lib/supabase";
 import { formatPrecio } from "../lib/calculos";
-
+import { recalcularTodo } from "../lib/recalcular";
+import ExportarExcel from "../components/ExportarExcel";
 const Title = styled.h1`
   font-family: "DM Serif Display", serif;
   font-size: 28px;
@@ -290,7 +291,10 @@ function EditModal({ insumo, onClose, onSaved }) {
       })
       .eq("id", insumo.id);
 
-    if (!error) onSaved();
+    if (!error) {
+      await recalcularTodo();
+      onSaved();
+    }
   }
 
   return (
@@ -399,6 +403,7 @@ function EditModal({ insumo, onClose, onSaved }) {
 function Insumos() {
   const [insumos, setInsumos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [recalculando, setRecalculando] = useState(false);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [editando, setEditando] = useState(null);
   const [form, setForm] = useState({
@@ -426,6 +431,13 @@ function Insumos() {
     setLoading(false);
   }
 
+  async function recalcular() {
+    setRecalculando(true);
+    await recalcularTodo();
+    setRecalculando(false);
+    alert("✅ Todos los costos se actualizaron");
+    fetchInsumos();
+  }
   const costoUnitario =
     form.presentacion && form.costo_presentacion
       ? parseFloat(form.costo_presentacion) / parseFloat(form.presentacion)
@@ -456,6 +468,7 @@ function Insumos() {
         notas: "",
       });
       setMostrarForm(false);
+      await recalcularTodo();
       fetchInsumos();
     }
   }
@@ -593,6 +606,11 @@ function Insumos() {
         <SectionTitle style={{ margin: 0, border: "none", padding: 0 }}>
           Mis insumos ({insumos.length})
         </SectionTitle>
+        <div style={{ flex: 1 }} />
+        <ExportarExcel datos={insumos} nombreArchivo="Insumos" tipo="insumos" />
+        <ButtonSecondary onClick={recalcular} disabled={recalculando}>
+          {recalculando ? "⏳ Recalculando..." : "🔄 Recalcular costos"}
+        </ButtonSecondary>
         {!mostrarForm && (
           <Button onClick={() => setMostrarForm(true)}>+ Nuevo insumo</Button>
         )}

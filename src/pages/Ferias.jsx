@@ -249,6 +249,7 @@ function Ferias() {
   const [carta, setCarta] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [filtroLugar, setFiltroLugar] = useState("todos");
 
   const [form, setForm] = useState({
     nombre: "",
@@ -287,7 +288,16 @@ function Ferias() {
     if (feriasData) setFerias(feriasData);
     setLoading(false);
   }
+  // Obtener lista única de lugares
+  const lugaresUnicos = [
+    ...new Set(ferias.map((f) => f.lugar).filter(Boolean)),
+  ];
 
+  // Filtrar ferias
+  const feriasFiltradas =
+    filtroLugar === "todos"
+      ? ferias
+      : ferias.filter((f) => f.lugar === filtroLugar);
   function addVenta() {
     setVentas([
       ...ventas,
@@ -512,10 +522,29 @@ function Ferias() {
         </Card>
       )}
 
-      <Row style={{ marginBottom: 20 }}>
+      <Row style={{ marginBottom: 20, alignItems: "center" }}>
         <SectionTitle style={{ margin: 0, border: "none", padding: 0 }}>
-          Historial ({ferias.length})
+          Historial ({feriasFiltradas.length})
         </SectionTitle>
+
+        {lugaresUnicos.length > 0 && (
+          <>
+            <Select
+              value={filtroLugar}
+              onChange={(e) => setFiltroLugar(e.target.value)}
+              style={{ width: "auto", minWidth: "200px" }}
+            >
+              <option value="todos">📍 Todas las ferias</option>
+              {lugaresUnicos.map((lugar) => (
+                <option key={lugar} value={lugar}>
+                  {lugar}
+                </option>
+              ))}
+            </Select>
+          </>
+        )}
+
+        <div style={{ flex: 1 }} />
         {!mostrarForm && (
           <Button onClick={() => setMostrarForm(true)}>+ Nueva feria</Button>
         )}
@@ -530,7 +559,7 @@ function Ferias() {
         </Empty>
       )}
 
-      {ferias.map((f) => {
+      {feriasFiltradas.map((f) => {
         const { ingresos, costosDia, ganancia } = calcularResumen(f);
         return (
           <FeiraCard key={f.id}>
