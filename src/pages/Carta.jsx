@@ -31,10 +31,18 @@ const Grid = styled.div`
   grid-template-columns: 1fr 1fr;
   gap: 16px;
   margin-bottom: 16px;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const Grid3 = styled(Grid)`
   grid-template-columns: 1fr 1fr 1fr;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const FormGroup = styled.div`
@@ -171,6 +179,10 @@ const ResultBox = styled.div`
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr 1fr;
+  }
 `;
 
 const ResultItem = styled.div`
@@ -237,6 +249,10 @@ const CartaStats = styled.div`
   background: ${(p) => p.theme.colors.background};
   border-radius: ${(p) => p.theme.radii.sm};
   padding: 12px 16px;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr 1fr;
+  }
 `;
 
 const StatItem = styled.div`
@@ -275,6 +291,7 @@ const Overlay = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
 `;
 
 const Modal = styled.div`
@@ -285,6 +302,13 @@ const Modal = styled.div`
   width: 100%;
   max-width: 600px;
   box-shadow: ${(p) => p.theme.shadows.lg};
+  max-height: 90vh;
+  overflow-y: auto;
+
+  @media (max-width: 640px) {
+    padding: 20px 16px;
+    border-radius: ${(p) => p.theme.radii.md};
+  }
 `;
 
 const ModalTitle = styled.h3`

@@ -49,6 +49,10 @@ const Grid2 = styled.div`
   grid-template-columns: 1fr 1fr;
   gap: 20px;
   margin-bottom: 20px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const LugarCard = styled(Card)`
@@ -67,6 +71,10 @@ const StatGrid = styled.div`
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   margin-bottom: 16px;
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr 1fr;
+  }
 `;
 
 const StatItem = styled.div`

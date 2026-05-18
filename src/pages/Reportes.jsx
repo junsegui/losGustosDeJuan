@@ -54,6 +54,10 @@ const Grid2 = styled.div`
   grid-template-columns: 1fr 1fr;
   gap: 20px;
   margin-bottom: 20px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const Empty = styled.div`

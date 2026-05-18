@@ -30,6 +30,10 @@ const Grid = styled.div`
   grid-template-columns: 1fr 1fr;
   gap: 16px;
   margin-bottom: 16px;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const FormGroup = styled.div`
@@ -176,6 +180,10 @@ const FeriaStats = styled.div`
   background: ${(p) => p.theme.colors.background};
   border-radius: ${(p) => p.theme.radii.sm};
   padding: 12px 16px;
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr 1fr;
+  }
 `;
 
 const StatItem = styled.div`
@@ -222,6 +230,7 @@ const ItemRow = styled.div`
   border-radius: ${(p) => p.theme.radii.sm};
   padding: 8px 12px;
   margin-bottom: 6px;
+
 `;
 
 const RemoveBtn = styled.button`

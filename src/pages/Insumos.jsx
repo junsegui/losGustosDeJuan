@@ -31,10 +31,18 @@ const Grid = styled.div`
   grid-template-columns: 1fr 1fr;
   gap: 16px;
   margin-bottom: 16px;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const Grid3 = styled(Grid)`
   grid-template-columns: 1fr 1fr 1fr;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const FormGroup = styled.div`
@@ -162,6 +170,12 @@ const InsumoItem = styled.div`
   border-radius: ${(p) => p.theme.radii.md};
   margin-bottom: 8px;
   box-shadow: ${(p) => p.theme.shadows.sm};
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+    padding: 12px 16px;
+    gap: 6px;
+  }
 `;
 
 const InsumoNombre = styled.div`
@@ -225,6 +239,7 @@ const Overlay = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
 `;
 
 const Modal = styled.div`
@@ -237,6 +252,11 @@ const Modal = styled.div`
   box-shadow: ${(p) => p.theme.shadows.lg};
   max-height: 90vh;
   overflow-y: auto;
+
+  @media (max-width: 640px) {
+    padding: 20px 16px;
+    border-radius: ${(p) => p.theme.radii.md};
+  }
 `;
 
 const ModalTitle = styled.h3`

@@ -8,6 +8,10 @@ const Title = styled.h1`
   font-size: 28px;
   color: ${(p) => p.theme.colors.text};
   margin-bottom: 4px;
+
+  @media (max-width: 640px) {
+    font-size: 22px;
+  }
 `;
 
 const Subtitle = styled.p`
@@ -21,6 +25,14 @@ const StatGrid = styled.div`
   grid-template-columns: repeat(4, 1fr);
   gap: 16px;
   margin-bottom: 28px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  @media (max-width: 420px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const StatCard = styled.div`
@@ -63,6 +75,10 @@ const Grid2 = styled.div`
   grid-template-columns: 1fr 1fr;
   gap: 20px;
   margin-bottom: 20px;
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const Card = styled.div`

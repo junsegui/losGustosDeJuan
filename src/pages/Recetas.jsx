@@ -23,6 +23,7 @@ const Card = styled.div`
   padding: 24px;
   margin-bottom: 20px;
   box-shadow: ${(p) => p.theme.shadows.sm};
+  overflow-x: auto;
 `;
 
 const Grid = styled.div`
@@ -30,10 +31,18 @@ const Grid = styled.div`
   grid-template-columns: 1fr 1fr;
   gap: 16px;
   margin-bottom: 16px;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const Grid3 = styled(Grid)`
   grid-template-columns: 1fr 1fr 1fr;
+
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const FormGroup = styled.div`
@@ -170,6 +179,7 @@ const IngredienteRow = styled.div`
   border-radius: ${(p) => p.theme.radii.sm};
   padding: 8px 12px;
   margin-bottom: 6px;
+  min-width: 460px;
 `;
 
 const RemoveBtn = styled.button`

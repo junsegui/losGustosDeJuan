@@ -35,6 +35,7 @@ const Overlay = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 16px;
   animation: fadeIn 0.2s;
 
   @keyframes fadeIn {
@@ -56,6 +57,13 @@ const Modal = styled.div`
   max-width: 500px;
   box-shadow: ${(p) => p.theme.shadows.lg};
   animation: slideUp 0.2s;
+
+  @media (max-width: 640px) {
+    padding: 20px 16px;
+    border-radius: ${(p) => p.theme.radii.md};
+    max-height: 90vh;
+    overflow-y: auto;
+  }
 
   @keyframes slideUp {
     from {
@@ -87,6 +95,10 @@ const Grid = styled.div`
   grid-template-columns: 1fr 1fr;
   gap: 16px;
   margin-bottom: 16px;
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const FormGroup = styled.div`
@@ -153,6 +165,10 @@ const ResultGrid = styled.div`
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-bottom: 16px;
+
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr 1fr;
+  }
 `;
 
 const ResultItem = styled.div`
