@@ -233,6 +233,23 @@ const ItemRow = styled.div`
 
 `;
 
+const TipoBadge = styled.span`
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  background: ${(p) =>
+    p.tipo === "puesto_ruta"
+      ? p.theme.colors.successLight
+      : p.theme.colors.primaryLight};
+  color: ${(p) =>
+    p.tipo === "puesto_ruta"
+      ? p.theme.colors.success
+      : p.theme.colors.primary};
+  margin-left: 8px;
+  vertical-align: middle;
+`;
+
 const RemoveBtn = styled.button`
   background: none;
   border: none;
@@ -253,15 +270,26 @@ const RemoveBtn = styled.button`
   }
 `;
 
+const TIPOS = [
+  { value: "feria", label: "🏪 Feria" },
+  { value: "puesto_ruta", label: "🚗 Puesto Ruta" },
+];
+
+function tipoLabel(tipo) {
+  return TIPOS.find((t) => t.value === tipo)?.label ?? "🏪 Feria";
+}
+
 function Ferias() {
   const [ferias, setFerias] = useState([]);
   const [carta, setCarta] = useState([]);
   const [loading, setLoading] = useState(true);
   const [mostrarForm, setMostrarForm] = useState(false);
   const [filtroLugar, setFiltroLugar] = useState("todos");
+  const [filtroTipo, setFiltroTipo] = useState("todos");
 
   const [form, setForm] = useState({
     nombre: "",
+    tipo: "feria",
     fecha: new Date().toISOString().split("T")[0],
     lugar: "",
     notas: "",
@@ -303,10 +331,11 @@ function Ferias() {
   ];
 
   // Filtrar ferias
-  const feriasFiltradas =
-    filtroLugar === "todos"
-      ? ferias
-      : ferias.filter((f) => f.lugar === filtroLugar);
+  const feriasFiltradas = ferias.filter((f) => {
+    if (filtroTipo !== "todos" && f.tipo !== filtroTipo) return false;
+    if (filtroLugar !== "todos" && f.lugar !== filtroLugar) return false;
+    return true;
+  });
   function addVenta() {
     setVentas([
       ...ventas,
@@ -345,6 +374,7 @@ function Ferias() {
       .from("ferias")
       .insert({
         nombre: form.nombre,
+        tipo: form.tipo,
         fecha: form.fecha,
         lugar: form.lugar || null,
         notas: form.notas || null,
@@ -381,6 +411,7 @@ function Ferias() {
 
     setForm({
       nombre: "",
+      tipo: "feria",
       fecha: new Date().toISOString().split("T")[0],
       lugar: "",
       notas: "",
@@ -412,21 +443,34 @@ function Ferias() {
 
   return (
     <div>
-      <Title>Ferias</Title>
-      <Subtitle>Registrá cada evento y lo que vendiste en el día.</Subtitle>
+      <Title>Eventos</Title>
+      <Subtitle>Ferias, puestos en ruta y todo lo que vendiste en el día.</Subtitle>
 
       {mostrarForm && (
         <Card>
-          <SectionTitle>Nueva Feria</SectionTitle>
+          <SectionTitle>Nuevo Evento</SectionTitle>
 
           <Grid>
             <FormGroup>
-              <Label>Nombre de la feria</Label>
+              <Label>Nombre</Label>
               <Input
                 placeholder="Ej: Feria de Palermo"
                 value={form.nombre}
                 onChange={(e) => setForm({ ...form, nombre: e.target.value })}
               />
+            </FormGroup>
+            <FormGroup>
+              <Label>Tipo</Label>
+              <Select
+                value={form.tipo}
+                onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+              >
+                {TIPOS.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </Select>
             </FormGroup>
             <FormGroup>
               <Label>Fecha</Label>
@@ -444,7 +488,7 @@ function Ferias() {
                 onChange={(e) => setForm({ ...form, lugar: e.target.value })}
               />
             </FormGroup>
-            <FormGroup>
+            <FormGroup style={{ gridColumn: "1 / -1" }}>
               <Label>Notas</Label>
               <Input
                 placeholder="Opcional"
@@ -536,26 +580,37 @@ function Ferias() {
           Historial ({feriasFiltradas.length})
         </SectionTitle>
 
+        <Select
+          value={filtroTipo}
+          onChange={(e) => setFiltroTipo(e.target.value)}
+          style={{ width: "auto" }}
+        >
+          <option value="todos">Todos los tipos</option>
+          {TIPOS.map((t) => (
+            <option key={t.value} value={t.value}>
+              {t.label}
+            </option>
+          ))}
+        </Select>
+
         {lugaresUnicos.length > 0 && (
-          <>
-            <Select
-              value={filtroLugar}
-              onChange={(e) => setFiltroLugar(e.target.value)}
-              style={{ width: "auto", minWidth: "200px" }}
-            >
-              <option value="todos">📍 Todas las ferias</option>
-              {lugaresUnicos.map((lugar) => (
-                <option key={lugar} value={lugar}>
-                  {lugar}
-                </option>
-              ))}
-            </Select>
-          </>
+          <Select
+            value={filtroLugar}
+            onChange={(e) => setFiltroLugar(e.target.value)}
+            style={{ width: "auto", minWidth: "160px" }}
+          >
+            <option value="todos">📍 Todos los lugares</option>
+            {lugaresUnicos.map((lugar) => (
+              <option key={lugar} value={lugar}>
+                {lugar}
+              </option>
+            ))}
+          </Select>
         )}
 
         <div style={{ flex: 1 }} />
         {!mostrarForm && (
-          <Button onClick={() => setMostrarForm(true)}>+ Nueva feria</Button>
+          <Button onClick={() => setMostrarForm(true)}>+ Nuevo evento</Button>
         )}
       </Row>
 
@@ -574,7 +629,12 @@ function Ferias() {
           <FeiraCard key={f.id}>
             <FeriaHeader>
               <div>
-                <FeriaNombre>{f.nombre}</FeriaNombre>
+                <FeriaNombre>
+                  {f.nombre}
+                  <TipoBadge tipo={f.tipo ?? "feria"}>
+                    {tipoLabel(f.tipo ?? "feria")}
+                  </TipoBadge>
+                </FeriaNombre>
                 <FeriaDetalle>
                   {f.fecha}
                   {f.lugar ? ` · ${f.lugar}` : ""}
