@@ -190,7 +190,7 @@ function App() {
     <BrowserRouter>
       <Layout>
         <Nav>
-          <Logo>🥩 Feria Manager</Logo>
+          <Logo>Los Gustos de Juan</Logo>
           <SearchWrapper>
             <BusquedaGlobal />
           </SearchWrapper>
