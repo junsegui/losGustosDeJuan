@@ -226,8 +226,14 @@ const Row = styled.div`
   align-items: center;
 `;
 
-function CalculadoraExpress() {
-  const [mostrar, setMostrar] = useState(false);
+function CalculadoraExpress({ isOpen: externalOpen, onClose: externalClose }) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const mostrar = internalOpen || !!externalOpen;
+
+  function cerrar() {
+    setInternalOpen(false);
+    externalClose?.();
+  }
   const [form, setForm] = useState({
     kgComprados: "",
     precioKg: "",
@@ -261,10 +267,10 @@ function CalculadoraExpress() {
 
   return (
     <>
-      <FloatingButton onClick={() => setMostrar(true)}>🧮</FloatingButton>
+      <FloatingButton onClick={() => setInternalOpen(true)}>🧮</FloatingButton>
 
       {mostrar && (
-        <Overlay onClick={() => setMostrar(false)}>
+        <Overlay onClick={cerrar}>
           <Modal onClick={(e) => e.stopPropagation()}>
             <ModalTitle>Calculadora Express</ModalTitle>
             <ModalSubtitle>
@@ -369,7 +375,7 @@ function CalculadoraExpress() {
             <Row>
               <ButtonSecondary onClick={limpiar}>Limpiar</ButtonSecondary>
               <div style={{ flex: 1 }} />
-              <ButtonSecondary onClick={() => setMostrar(false)}>
+              <ButtonSecondary onClick={cerrar}>
                 Cerrar
               </ButtonSecondary>
             </Row>

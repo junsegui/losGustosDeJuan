@@ -4,6 +4,7 @@ export const theme = {
     background: "#FAF7F2",
     surface: "#FFFFFF",
     surfaceAlt: "#F2EDE4",
+    surfaceHover: "#EDE6DA",
 
     // Acentos
     primary: "#E8721C",
@@ -22,10 +23,17 @@ export const theme = {
     warningLight: "#FFF3E0",
     danger: "#C62828",
     dangerLight: "#FFEBEE",
+    info: "#1565C0",
+    infoLight: "#E3F2FD",
 
     // Bordes
     border: "#E0D8CE",
     borderStrong: "#C8BDB0",
+  },
+  fonts: {
+    serif: '"DM Serif Display", Georgia, serif',
+    sans: '"DM Sans", system-ui, sans-serif',
+    mono: '"DM Mono", ui-monospace, monospace',
   },
   radii: {
     sm: "6px",
@@ -33,8 +41,8 @@ export const theme = {
     lg: "16px",
   },
   shadows: {
-    sm: "0 1px 4px rgba(0,0,0,0.06)",
-    md: "0 4px 16px rgba(0,0,0,0.08)",
-    lg: "0 8px 32px rgba(0,0,0,0.10)",
+    sm: "0 1px 4px rgba(26, 18, 8, 0.06)",
+    md: "0 4px 16px rgba(26, 18, 8, 0.08)",
+    lg: "0 12px 36px rgba(26, 18, 8, 0.12)",
   },
 };

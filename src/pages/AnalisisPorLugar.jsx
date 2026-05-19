@@ -1,210 +1,234 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import { supabase } from "../lib/supabase";
-import { formatPrecio } from "../lib/calculos";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import { MapPin, Calendar } from "lucide-react";
 
-const Title = styled.h1`
-  font-family: "DM Serif Display", serif;
+// ─── Layout ───────────────────────────────────────────────────────────────────
+
+const PageTitle = styled.h1`
+  font-family: ${(p) => p.theme.fonts.serif};
   font-size: 28px;
   color: ${(p) => p.theme.colors.text};
   margin-bottom: 4px;
 `;
 
-const Subtitle = styled.p`
+const PageSub = styled.p`
   color: ${(p) => p.theme.colors.textMuted};
   font-size: 14px;
   margin-bottom: 28px;
 `;
 
-const Card = styled.div`
+const ListWrap = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
+// ─── Card ─────────────────────────────────────────────────────────────────────
+
+const LugarCard = styled.div`
   background: ${(p) => p.theme.colors.surface};
   border: 1px solid ${(p) => p.theme.colors.border};
-  border-radius: ${(p) => p.theme.radii.lg};
-  padding: 24px;
-  margin-bottom: 20px;
+  border-radius: ${(p) => p.theme.radii.md};
+  padding: 18px 20px;
   box-shadow: ${(p) => p.theme.shadows.sm};
-`;
-
-const CardTitle = styled.h2`
-  font-size: 16px;
-  font-weight: 600;
-  color: ${(p) => p.theme.colors.text};
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid ${(p) => p.theme.colors.border};
-`;
-
-const Grid2 = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  margin-bottom: 20px;
+  grid-template-columns: 48px 1fr auto;
+  align-items: center;
+  gap: 16px;
+  transition: box-shadow 0.15s;
 
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
+  &:hover { box-shadow: ${(p) => p.theme.shadows.md}; }
+
+  @media (max-width: 600px) {
+    grid-template-columns: 40px 1fr auto;
+    gap: 12px;
   }
 `;
 
-const LugarCard = styled(Card)`
-  border-left: 4px solid ${(p) => p.theme.colors.primary};
+const PosBlock = styled.div`
+  width: 44px;
+  height: 44px;
+  border-radius: ${(p) => p.theme.radii.sm};
+  background: ${(p) => p.$first ? p.theme.colors.primary : p.theme.colors.surfaceAlt};
+  color: ${(p) => p.$first ? "white" : p.theme.colors.textMuted};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ${(p) => p.theme.fonts.serif};
+  font-size: 18px;
+  flex-shrink: 0;
+`;
+
+const CardBody = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 `;
 
 const LugarNombre = styled.div`
+  font-family: ${(p) => p.theme.fonts.serif};
   font-size: 18px;
-  font-weight: 700;
   color: ${(p) => p.theme.colors.text};
-  margin-bottom: 16px;
+  line-height: 1.2;
 `;
 
-const StatGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+const MetaRow = styled.div`
+  display: flex;
+  align-items: center;
   gap: 12px;
-  margin-bottom: 16px;
-
-  @media (max-width: 480px) {
-    grid-template-columns: 1fr 1fr;
-  }
+  flex-wrap: wrap;
 `;
 
-const StatItem = styled.div`
-  background: ${(p) => p.theme.colors.background};
-  padding: 12px;
-  border-radius: ${(p) => p.theme.radii.sm};
+const MetaPill = styled.span`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: ${(p) => p.theme.colors.textMuted};
 `;
 
-const StatLabel = styled.div`
+const VisitaRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+`;
+
+const VisitaItem = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: ${(p) => p.$accent ? p.theme.colors.primary : p.theme.colors.textMuted};
+  font-weight: ${(p) => p.$accent ? "600" : "400"};
+`;
+
+const BarWrap = styled.div`
+  margin-top: 8px;
+`;
+
+const BarTrack = styled.div`
+  height: 4px;
+  background: ${(p) => p.theme.colors.surfaceAlt};
+  border-radius: 2px;
+  overflow: hidden;
+`;
+
+const BarFill = styled.div`
+  height: 100%;
+  background: ${(p) => p.theme.colors.primary};
+  border-radius: 2px;
+  width: ${(p) => p.$pct}%;
+  opacity: 0.6;
+  transition: width 0.4s;
+`;
+
+const CountBlock = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+`;
+
+const CountNum = styled.div`
+  font-family: ${(p) => p.theme.fonts.serif};
+  font-size: 36px;
+  color: ${(p) => p.theme.colors.primary};
+  line-height: 1;
+`;
+
+const CountLabel = styled.div`
   font-size: 11px;
   color: ${(p) => p.theme.colors.textMuted};
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 4px;
-`;
-
-const StatValue = styled.div`
-  font-size: 18px;
-  font-weight: 700;
-  color: ${(p) => (p.green ? p.theme.colors.success : p.theme.colors.text)};
-`;
-
-const ProductoDestacado = styled.div`
-  background: ${(p) => p.theme.colors.primaryLight};
-  border: 1px solid ${(p) => p.theme.colors.primary}33;
-  border-radius: ${(p) => p.theme.radii.sm};
-  padding: 12px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-`;
-
-const ProductoNombre = styled.div`
-  font-weight: 600;
-  color: ${(p) => p.theme.colors.text};
-`;
-
-const ProductoCantidad = styled.div`
-  font-size: 14px;
-  color: ${(p) => p.theme.colors.primary};
-  font-weight: 600;
+  text-align: right;
 `;
 
 const Empty = styled.div`
   text-align: center;
-  padding: 40px;
+  padding: 60px 24px;
   color: ${(p) => p.theme.colors.textMuted};
   font-size: 14px;
 `;
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const MESES = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+
+function formatFecha(str) {
+  if (!str) return null;
+  const [y, m, d] = str.split("-").map(Number);
+  return `${d} ${MESES[m - 1]} ${y}`;
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 function AnalisisPorLugar() {
   const [ferias, setFerias] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchDatos();
+  const fetchDatos = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase
+      .from("ferias")
+      .select("id, nombre, tipo, fecha, lugar")
+      .order("fecha", { ascending: true });
+    if (data) setFerias(data);
+    setLoading(false);
   }, []);
 
-  async function fetchDatos() {
-    setLoading(true);
-    const { data: feriasData } = await supabase
-      .from("ferias")
-      .select(
-        `
-        *,
-        ventas_feria(*, carta(nombre_comercial)),
-        costos_feria(*)
-      `,
-      )
-      .order("fecha", { ascending: true });
+  useEffect(() => { fetchDatos(); }, [fetchDatos]);
 
-    if (feriasData) setFerias(feriasData);
-    setLoading(false);
-  }
+  const hoy = new Date().toISOString().split("T")[0];
 
-  // Agrupar por lugar
-  const porLugar = {};
+  // Group by lugar, skip events with no lugar
+  const lugarMap = {};
   ferias.forEach((f) => {
-    const lugar = f.lugar || "Sin lugar especificado";
-    if (!porLugar[lugar]) {
-      porLugar[lugar] = {
-        ferias: [],
-        totalGanancia: 0,
-        totalIngresos: 0,
-        totalCostos: 0,
-        productos: {},
-      };
+    const lugar = f.lugar?.trim();
+    if (!lugar) return;
+
+    if (!lugarMap[lugar]) {
+      lugarMap[lugar] = { nombre: lugar, total: 0, ferias: 0, puestos: 0, fechas: [] };
     }
-
-    const ingresos = (f.ventas_feria || []).reduce(
-      (s, v) => s + v.cantidad * v.precio_venta_real,
-      0,
-    );
-    const costos = (f.costos_feria || []).reduce((s, c) => s + c.monto, 0);
-    const ganancia = ingresos - costos;
-
-    porLugar[lugar].ferias.push(f);
-    porLugar[lugar].totalGanancia += ganancia;
-    porLugar[lugar].totalIngresos += ingresos;
-    porLugar[lugar].totalCostos += costos;
-
-    // Contar productos vendidos
-    f.ventas_feria?.forEach((v) => {
-      const nombre = v.carta?.nombre_comercial || "Sin nombre";
-      if (!porLugar[lugar].productos[nombre]) {
-        porLugar[lugar].productos[nombre] = 0;
-      }
-      porLugar[lugar].productos[nombre] += v.cantidad;
-    });
+    lugarMap[lugar].total++;
+    if (f.tipo === "puesto_ruta") lugarMap[lugar].puestos++;
+    else lugarMap[lugar].ferias++;
+    lugarMap[lugar].fechas.push(f.fecha);
   });
 
-  // Datos para el gráfico
-  const datosGrafico = Object.entries(porLugar)
-    .map(([lugar, data]) => ({
-      lugar: lugar.length > 15 ? lugar.substring(0, 15) + "..." : lugar,
-      ganancia: data.totalGanancia,
-      eventos: data.ferias.length,
-    }))
-    .sort((a, b) => b.ganancia - a.ganancia);
+  const lugares = Object.values(lugarMap)
+    .sort((a, b) => b.total - a.total)
+    .map((l, i) => {
+      const pasadas = [...l.fechas].filter((f) => f < hoy).sort().reverse();
+      const futuras = [...l.fechas].filter((f) => f >= hoy).sort();
+      return {
+        ...l,
+        posicion: i + 1,
+        ultimaVisita: pasadas[0] || null,
+        proximaVisita: futuras[0] || null,
+      };
+    });
 
-  if (loading) return <Empty>Cargando...</Empty>;
+  const maxTotal = Math.max(...lugares.map((l) => l.total), 1);
+  const sinLugar = ferias.filter((f) => !f.lugar?.trim()).length;
 
-  if (Object.keys(porLugar).length === 0) {
+  if (loading) {
+    return <Empty>Cargando...</Empty>;
+  }
+
+  if (lugares.length === 0) {
     return (
       <div>
-        <Title>Análisis por Lugar</Title>
-        <Subtitle>Comparación de rendimiento en cada feria.</Subtitle>
+        <PageTitle>Análisis por lugar</PageTitle>
+        <PageSub>Frecuencia de visitas y agenda por ubicación.</PageSub>
         <Empty>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>📍</div>
-          <p>No hay ferias con lugares especificados todavía.</p>
+          <div style={{ fontSize: 44, marginBottom: 12 }}>📍</div>
+          <p>No hay eventos con lugar especificado todavía.</p>
+          <p style={{ marginTop: 6, fontSize: 13 }}>
+            Agregá el campo "Lugar" en tus eventos para ver este análisis.
+          </p>
         </Empty>
       </div>
     );
@@ -212,81 +236,63 @@ function AnalisisPorLugar() {
 
   return (
     <div>
-      <Title>Análisis por Lugar</Title>
-      <Subtitle>Comparación de rendimiento en cada feria.</Subtitle>
+      <PageTitle>Análisis por lugar</PageTitle>
+      <PageSub>
+        Frecuencia de visitas por ubicación.
+        {sinLugar > 0 && ` · ${sinLugar} evento${sinLugar !== 1 ? "s" : ""} sin lugar asignado.`}
+      </PageSub>
 
-      <Card>
-        <CardTitle>📊 Ganancia total por lugar</CardTitle>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={datosGrafico}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E0D8CE" />
-            <XAxis dataKey="lugar" tick={{ fill: "#8C7B6B", fontSize: 12 }} />
-            <YAxis tick={{ fill: "#8C7B6B", fontSize: 12 }} />
-            <Tooltip
-              contentStyle={{
-                background: "#FFFFFF",
-                border: "1px solid #E0D8CE",
-                borderRadius: "8px",
-              }}
-              formatter={(value, name) => {
-                if (name === "ganancia") return formatPrecio(value);
-                return value;
-              }}
-            />
-            <Legend />
-            <Bar dataKey="ganancia" fill="#E8721C" name="Ganancia total" />
-            <Bar dataKey="eventos" fill="#3498db" name="Cantidad de eventos" />
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
+      <ListWrap>
+        {lugares.map((l) => (
+          <LugarCard key={l.nombre}>
+            <PosBlock $first={l.posicion === 1}>
+              {String(l.posicion).padStart(2, "0")}
+            </PosBlock>
 
-      <Grid2>
-        {Object.entries(porLugar)
-          .sort((a, b) => b[1].totalGanancia - a[1].totalGanancia)
-          .map(([lugar, data]) => {
-            const promedioGanancia = data.totalGanancia / data.ferias.length;
-            const productoTop = Object.entries(data.productos).sort(
-              (a, b) => b[1] - a[1],
-            )[0];
+            <CardBody>
+              <LugarNombre>{l.nombre}</LugarNombre>
 
-            return (
-              <LugarCard key={lugar}>
-                <LugarNombre>📍 {lugar}</LugarNombre>
+              <MetaRow>
+                <MetaPill>
+                  <MapPin size={11} />
+                  {l.ferias > 0 && `${l.ferias} feria${l.ferias !== 1 ? "s" : ""}`}
+                  {l.ferias > 0 && l.puestos > 0 && " · "}
+                  {l.puestos > 0 && `${l.puestos} puesto${l.puestos !== 1 ? "s" : ""}`}
+                </MetaPill>
+              </MetaRow>
 
-                <StatGrid>
-                  <StatItem>
-                    <StatLabel>Total ganado</StatLabel>
-                    <StatValue green>
-                      {formatPrecio(data.totalGanancia)}
-                    </StatValue>
-                  </StatItem>
-                  <StatItem>
-                    <StatLabel>Eventos</StatLabel>
-                    <StatValue>{data.ferias.length}</StatValue>
-                  </StatItem>
-                  <StatItem>
-                    <StatLabel>Promedio/evento</StatLabel>
-                    <StatValue>{formatPrecio(promedioGanancia)}</StatValue>
-                  </StatItem>
-                </StatGrid>
-
-                {productoTop && (
-                  <div>
-                    <StatLabel style={{ marginBottom: 8 }}>
-                      ⭐ Producto más vendido
-                    </StatLabel>
-                    <ProductoDestacado>
-                      <ProductoNombre>{productoTop[0]}</ProductoNombre>
-                      <ProductoCantidad>
-                        {productoTop[1]} unidades
-                      </ProductoCantidad>
-                    </ProductoDestacado>
-                  </div>
+              <VisitaRow>
+                {l.proximaVisita && (
+                  <VisitaItem $accent>
+                    <Calendar size={11} />
+                    Próxima: {formatFecha(l.proximaVisita)}
+                  </VisitaItem>
                 )}
-              </LugarCard>
-            );
-          })}
-      </Grid2>
+                {l.ultimaVisita && (
+                  <VisitaItem>
+                    <Calendar size={11} />
+                    Última: {formatFecha(l.ultimaVisita)}
+                  </VisitaItem>
+                )}
+                {!l.proximaVisita && !l.ultimaVisita && (
+                  <VisitaItem>Sin fechas registradas</VisitaItem>
+                )}
+              </VisitaRow>
+
+              <BarWrap>
+                <BarTrack>
+                  <BarFill $pct={(l.total / maxTotal) * 100} />
+                </BarTrack>
+              </BarWrap>
+            </CardBody>
+
+            <CountBlock>
+              <CountNum>{l.total}</CountNum>
+              <CountLabel>visita{l.total !== 1 ? "s" : ""}</CountLabel>
+            </CountBlock>
+          </LugarCard>
+        ))}
+      </ListWrap>
     </div>
   );
 }

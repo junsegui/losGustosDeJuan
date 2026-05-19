@@ -1,54 +1,258 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
 import { supabase } from "../lib/supabase";
 import { formatPrecio } from "../lib/calculos";
+import { recalcularTodo } from "../lib/recalcular";
+import ExportarExcel from "../components/ExportarExcel";
+import { Plus, Pencil, Trash2, Search, X } from "lucide-react";
+import { useToast } from "../components/Toast";
 
-const Title = styled.h1`
-  font-family: "DM Serif Display", serif;
+// ─── Table ────────────────────────────────────────────────────────────────────
+
+const COLS = "2fr 1fr 110px 140px 150px 80px";
+
+const PageHead = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+`;
+
+const PageTitle = styled.h1`
+  font-family: ${(p) => p.theme.fonts.serif};
   font-size: 28px;
   color: ${(p) => p.theme.colors.text};
   margin-bottom: 4px;
 `;
 
-const Subtitle = styled.p`
+const PageSub = styled.p`
   color: ${(p) => p.theme.colors.textMuted};
   font-size: 14px;
-  margin-bottom: 28px;
 `;
 
-const Card = styled.div`
+const BtnPrimary = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  background: ${(p) => p.theme.colors.primary};
+  color: white;
+  border: none;
+  border-radius: ${(p) => p.theme.radii.sm};
+  font-family: ${(p) => p.theme.fonts.sans};
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+
+  &:hover { background: ${(p) => p.theme.colors.primaryHover}; transform: translateY(-1px); }
+  &:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+`;
+
+const Toolbar = styled.div`
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+`;
+
+const SearchWrap = styled.div`
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+  max-width: 300px;
+`;
+
+const SearchIcon = styled.div`
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: ${(p) => p.theme.colors.textMuted};
+  display: flex;
+`;
+
+const SearchInput = styled.input`
+  width: 100%;
+  background: ${(p) => p.theme.colors.surface};
+  border: 1px solid ${(p) => p.theme.colors.border};
+  border-radius: ${(p) => p.theme.radii.sm};
+  color: ${(p) => p.theme.colors.text};
+  font-family: ${(p) => p.theme.fonts.sans};
+  font-size: 14px;
+  padding: 8px 12px 8px 32px;
+  outline: none;
+
+  &:focus { border-color: ${(p) => p.theme.colors.primary}; }
+  &::placeholder { color: ${(p) => p.theme.colors.textLight}; }
+`;
+
+const Counter = styled.span`
+  font-size: 13px;
+  color: ${(p) => p.theme.colors.textMuted};
+  margin-left: auto;
+`;
+
+const Table = styled.div`
+  background: ${(p) => p.theme.colors.surface};
+  border: 1px solid ${(p) => p.theme.colors.border};
+  border-radius: ${(p) => p.theme.radii.md};
+  overflow: hidden;
+`;
+
+const THead = styled.div`
+  display: grid;
+  grid-template-columns: ${COLS};
+  padding: 10px 16px;
+  background: ${(p) => p.theme.colors.surfaceAlt};
+  border-bottom: 1px solid ${(p) => p.theme.colors.border};
+  gap: 12px;
+`;
+
+const TH = styled.div`
+  font-size: 11px;
+  font-weight: 700;
+  color: ${(p) => p.theme.colors.textMuted};
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
+const TRow = styled.div`
+  display: grid;
+  grid-template-columns: ${COLS};
+  padding: 12px 16px;
+  align-items: center;
+  border-bottom: 1px solid ${(p) => p.theme.colors.border};
+  gap: 12px;
+  transition: background 0.1s;
+
+  &:last-child { border-bottom: none; }
+  &:hover { background: ${(p) => p.theme.colors.surfaceHover}; }
+`;
+
+const CellMain = styled.div`
+  font-size: 14px;
+  font-weight: 500;
+  color: ${(p) => p.theme.colors.text};
+`;
+
+const CellSub = styled.div`
+  font-size: 12px;
+  color: ${(p) => p.theme.colors.textMuted};
+  margin-top: 1px;
+`;
+
+const Pill = styled.span`
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: ${(p) => p.theme.colors.primaryLight};
+  color: ${(p) => p.theme.colors.primary};
+`;
+
+const Accent = styled.span`
+  font-size: 14px;
+  font-weight: 700;
+  color: ${(p) => p.theme.colors.primary};
+`;
+
+const ActionsCell = styled.div`
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+`;
+
+const IconBtn = styled.button`
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: ${(p) => p.theme.radii.sm};
+  cursor: pointer;
+  transition: all 0.15s;
+  background: transparent;
+  color: ${(p) => p.theme.colors.textMuted};
+
+  &:hover {
+    background: ${(p) => p.$danger ? p.theme.colors.dangerLight : p.theme.colors.surfaceAlt};
+    color: ${(p) => p.$danger ? p.theme.colors.danger : p.theme.colors.text};
+  }
+`;
+
+const Empty = styled.div`
+  text-align: center;
+  padding: 60px 24px;
+  color: ${(p) => p.theme.colors.textMuted};
+  font-size: 14px;
+`;
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+
+const Overlay = styled.div`
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.15s;
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+`;
+
+const Modal = styled.div`
   background: ${(p) => p.theme.colors.surface};
   border: 1px solid ${(p) => p.theme.colors.border};
   border-radius: ${(p) => p.theme.radii.lg};
-  padding: 24px;
-  margin-bottom: 20px;
-  box-shadow: ${(p) => p.theme.shadows.sm};
-  overflow-x: auto;
+  padding: 28px;
+  width: 100%;
+  max-width: 680px;
+  box-shadow: ${(p) => p.theme.shadows.lg};
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: slideUp 0.15s;
+
+  @keyframes slideUp {
+    from { transform: translateY(12px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
 `;
 
-const Grid = styled.div`
+const ModalHead = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+`;
+
+const ModalTitle = styled.h3`
+  font-family: ${(p) => p.theme.fonts.serif};
+  font-size: 20px;
+  color: ${(p) => p.theme.colors.text};
+`;
+
+const FormGrid = styled.div`
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 16px;
-
-  @media (max-width: 640px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const Grid3 = styled(Grid)`
   grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
 
-  @media (max-width: 640px) {
-    grid-template-columns: 1fr;
-  }
+  @media (max-width: 480px) { grid-template-columns: 1fr; }
 `;
 
 const FormGroup = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 `;
 
 const Label = styled.label`
@@ -64,561 +268,488 @@ const Input = styled.input`
   border: 1px solid ${(p) => p.theme.colors.border};
   border-radius: ${(p) => p.theme.radii.sm};
   color: ${(p) => p.theme.colors.text};
-  font-family: "DM Sans", sans-serif;
+  font-family: ${(p) => p.theme.fonts.sans};
   font-size: 14px;
-  padding: 10px 14px;
+  padding: 9px 12px;
   outline: none;
-  transition: border-color 0.2s;
 
-  &:focus {
-    border-color: ${(p) => p.theme.colors.primary};
-  }
-
-  &::placeholder {
-    color: ${(p) => p.theme.colors.textLight};
-  }
+  &:focus { border-color: ${(p) => p.theme.colors.primary}; }
+  &::placeholder { color: ${(p) => p.theme.colors.textLight}; }
 `;
 
-const Select = styled.select`
+const SelectInput = styled.select`
   background: ${(p) => p.theme.colors.background};
   border: 1px solid ${(p) => p.theme.colors.border};
   border-radius: ${(p) => p.theme.radii.sm};
   color: ${(p) => p.theme.colors.text};
-  font-family: "DM Sans", sans-serif;
+  font-family: ${(p) => p.theme.fonts.sans};
   font-size: 14px;
-  padding: 10px 14px;
+  padding: 9px 12px;
   outline: none;
   cursor: pointer;
-  transition: border-color 0.2s;
 
-  &:focus {
-    border-color: ${(p) => p.theme.colors.primary};
-  }
+  &:focus { border-color: ${(p) => p.theme.colors.primary}; }
 `;
 
-const Button = styled.button`
-  padding: 10px 20px;
-  border-radius: ${(p) => p.theme.radii.sm};
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  transition: all 0.15s;
-  background: ${(p) => p.theme.colors.primary};
-  color: white;
-
-  &:hover {
-    background: ${(p) => p.theme.colors.primaryHover};
-    transform: translateY(-1px);
-  }
-`;
-
-const ButtonSecondary = styled(Button)`
-  background: ${(p) => p.theme.colors.surfaceAlt};
-  color: ${(p) => p.theme.colors.text};
-  border: 1px solid ${(p) => p.theme.colors.border};
-
-  &:hover {
-    background: ${(p) => p.theme.colors.border};
-    transform: translateY(-1px);
-  }
-`;
-
-const ButtonDanger = styled(Button)`
-  background: ${(p) => p.theme.colors.dangerLight};
-  color: ${(p) => p.theme.colors.danger};
-  border: 1px solid ${(p) => p.theme.colors.danger}33;
-
-  &:hover {
-    background: ${(p) => p.theme.colors.danger};
-    color: white;
-  }
-`;
-
-const Row = styled.div`
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  flex-wrap: wrap;
-`;
-
-const SectionTitle = styled.h2`
-  font-size: 16px;
-  font-weight: 600;
-  color: ${(p) => p.theme.colors.text};
-  margin-bottom: 16px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid ${(p) => p.theme.colors.border};
-`;
-
-const SubTitle = styled.div`
-  font-size: 13px;
-  font-weight: 600;
+const SectionLabel = styled.div`
+  font-size: 12px;
+  font-weight: 700;
   color: ${(p) => p.theme.colors.textMuted};
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 8px;
-  margin-top: 16px;
+  margin: 20px 0 10px;
 `;
 
-const Empty = styled.div`
-  text-align: center;
-  padding: 40px;
-  color: ${(p) => p.theme.colors.textMuted};
-  font-size: 14px;
-`;
-
-const IngredienteRow = styled.div`
+const IngRow = styled.div`
   display: grid;
-  grid-template-columns: 2fr 100px 100px 100px 100px 32px;
+  grid-template-columns: 2fr 90px 80px 80px 80px 32px;
   gap: 8px;
   align-items: center;
+  padding: 8px 10px;
   background: ${(p) => p.theme.colors.background};
   border: 1px solid ${(p) => p.theme.colors.border};
   border-radius: ${(p) => p.theme.radii.sm};
-  padding: 8px 12px;
   margin-bottom: 6px;
-  min-width: 580px;
+  overflow-x: auto;
+
+  @media (max-width: 600px) { grid-template-columns: 1fr 80px 32px; }
 `;
 
 const RemoveBtn = styled.button`
-  background: none;
-  border: none;
-  color: ${(p) => p.theme.colors.textMuted};
-  cursor: pointer;
-  font-size: 18px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  border: none;
+  border-radius: ${(p) => p.theme.radii.sm};
+  cursor: pointer;
+  background: transparent;
+  color: ${(p) => p.theme.colors.textMuted};
   transition: all 0.15s;
 
-  &:hover {
-    color: ${(p) => p.theme.colors.danger};
-    background: ${(p) => p.theme.colors.dangerLight};
-  }
+  &:hover { background: ${(p) => p.theme.colors.dangerLight}; color: ${(p) => p.theme.colors.danger}; }
 `;
 
-const ResultBox = styled.div`
+const AddIngBtn = styled.button`
+  padding: 7px 14px;
+  border-radius: ${(p) => p.theme.radii.sm};
+  font-family: ${(p) => p.theme.fonts.sans};
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px dashed ${(p) => p.theme.colors.border};
+  background: transparent;
+  color: ${(p) => p.theme.colors.textMuted};
+  transition: all 0.15s;
+  margin-top: 4px;
+
+  &:hover { border-color: ${(p) => p.theme.colors.primary}; color: ${(p) => p.theme.colors.primary}; }
+`;
+
+const CostBox = styled.div`
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
   background: ${(p) => p.theme.colors.primaryLight};
   border: 1px solid ${(p) => p.theme.colors.primary}33;
   border-radius: ${(p) => p.theme.radii.md};
-  padding: 16px 20px;
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  padding: 14px 18px;
+  margin-top: 16px;
 `;
 
-const ResultItem = styled.div`
+const CostItem = styled.div`
   display: flex;
   flex-direction: column;
   gap: 4px;
 `;
 
-const ResultLabel = styled.span`
+const CostLabel = styled.span`
   font-size: 11px;
+  font-weight: 700;
   color: ${(p) => p.theme.colors.textMuted};
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  font-weight: 600;
 `;
 
-const ResultValue = styled.span`
+const CostValue = styled.span`
   font-size: 18px;
   font-weight: 700;
-  color: ${(p) => (p.highlight ? p.theme.colors.primary : p.theme.colors.text)};
+  color: ${(p) => p.$accent ? p.theme.colors.primary : p.theme.colors.text};
 `;
 
-const SubRecetaCard = styled(Card)`
-  padding: 16px 24px;
-  margin-bottom: 10px;
-`;
-
-const SubRecetaHeader = styled.div`
+const ModalFooter = styled.div`
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 22px;
 `;
 
-const SubRecetaNombre = styled.div`
-  font-weight: 600;
-  font-size: 16px;
-`;
-
-const SubRecetaDetalle = styled.div`
-  font-size: 13px;
-  color: ${(p) => p.theme.colors.textMuted};
-  margin-top: 2px;
-`;
-
-const SubRecetaStats = styled.div`
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  background: ${(p) => p.theme.colors.background};
+const BtnGhost = styled.button`
+  padding: 9px 16px;
   border-radius: ${(p) => p.theme.radii.sm};
-  padding: 12px 16px;
-`;
-
-const StatItem = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-`;
-
-const StatLabel = styled.span`
-  font-size: 11px;
+  font-family: ${(p) => p.theme.fonts.sans};
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid ${(p) => p.theme.colors.border};
+  background: transparent;
   color: ${(p) => p.theme.colors.textMuted};
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  transition: all 0.15s;
+
+  &:hover { background: ${(p) => p.theme.colors.surfaceAlt}; color: ${(p) => p.theme.colors.text}; }
 `;
 
-const StatValue = styled.span`
-  font-size: 15px;
-  font-weight: 600;
-  color: ${(p) => (p.highlight ? p.theme.colors.primary : p.theme.colors.text)};
-`;
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const UNIDADES_RINDE = ["gr", "kg", "un", "ml", "l"];
+
+const FORM_VACIO = {
+  nombre: "",
+  categoria: "",
+  rinde: "",
+  unidad_rinde: "gr",
+  notas: "",
+};
+
+const ING_VACIO = { insumo_id: "", cantidad: "", unidad: "gr", desperdicio: 0, merma: 0 };
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 function SubRecetas() {
   const [subRecetas, setSubRecetas] = useState([]);
   const [insumos, setInsumos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [mostrarForm, setMostrarForm] = useState(false);
-
-  const [form, setForm] = useState({
-    nombre: "",
-    categoria: "",
-    rinde: "",
-    unidad_rinde: "gr",
-    notas: "",
-  });
-
+  const [busqueda, setBusqueda] = useState("");
+  const [modal, setModal] = useState(null); // null | "add" | sr-obj
+  const [form, setForm] = useState(FORM_VACIO);
   const [ingredientes, setIngredientes] = useState([]);
+  const [guardando, setGuardando] = useState(false);
+  const toast = useToast();
 
-  useEffect(() => {
-    fetchTodo();
-  }, []);
-
-  async function fetchTodo() {
+  const fetchTodo = useCallback(async () => {
     setLoading(true);
     const [{ data: subs }, { data: ins }] = await Promise.all([
-      supabase
-        .from("sub_recetas")
-        .select("*")
-        .order("created_at", { ascending: false }),
+      supabase.from("sub_recetas").select("*").order("nombre"),
       supabase.from("insumos").select("*").order("nombre"),
     ]);
     if (subs) setSubRecetas(subs);
     if (ins) setInsumos(ins);
     setLoading(false);
-  }
+  }, []);
 
-  function addIngrediente() {
-    setIngredientes([
-      ...ingredientes,
-      { insumo_id: "", cantidad: "", unidad: "gr", desperdicio: 0, merma: 0 },
-    ]);
-  }
+  useEffect(() => { fetchTodo(); }, [fetchTodo]);
 
-  function removeIngrediente(i) {
-    setIngredientes(ingredientes.filter((_, idx) => idx !== i));
-  }
+  useEffect(() => {
+    const handler = (e) => { if (e.key === "Escape") setModal(null); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
-  function updateIngrediente(i, field, value) {
-    const nuevos = [...ingredientes];
-    nuevos[i][field] = value;
-    setIngredientes(nuevos);
-  }
-
-  // Calcular costo total y unitario en tiempo real
   const costoTotal = ingredientes.reduce((sum, ing) => {
-    const insumo = insumos.find((ins) => ins.id === ing.insumo_id);
-    if (!insumo || !ing.cantidad) return sum;
-    const costo = insumo.costo_unitario * parseFloat(ing.cantidad);
-    return sum + costo;
+    const ins = insumos.find((i) => i.id === ing.insumo_id);
+    if (!ins || !ing.cantidad) return sum;
+    return sum + ins.costo_unitario * parseFloat(ing.cantidad);
   }, 0);
 
   const costoUnitario = form.rinde ? costoTotal / parseFloat(form.rinde) : 0;
 
-  async function guardarSubReceta() {
-    if (!form.nombre.trim()) return alert("El nombre es obligatorio");
-    if (!form.rinde) return alert("El rinde es obligatorio");
-    if (ingredientes.length === 0)
-      return alert("Agregá al menos un ingrediente");
+  const filtrados = subRecetas.filter((sr) =>
+    !busqueda || sr.nombre.toLowerCase().includes(busqueda.toLowerCase())
+  );
 
-    // 1. Crear sub-receta
-    const { data: subReceta, error } = await supabase
-      .from("sub_recetas")
-      .insert({
-        nombre: form.nombre,
-        categoria: form.categoria || null,
-        rinde: parseFloat(form.rinde),
-        unidad_rinde: form.unidad_rinde,
-        costo_total: costoTotal,
-        costo_unitario: costoUnitario,
-        notas: form.notas || null,
-      })
-      .select()
-      .single();
+  function abrirAdd() {
+    setForm(FORM_VACIO);
+    setIngredientes([]);
+    setModal("add");
+  }
 
-    if (error) return alert("Error al guardar");
+  async function abrirEdit(sr) {
+    const { data } = await supabase
+      .from("ingredientes_sub_receta")
+      .select("*")
+      .eq("sub_receta_id", sr.id);
 
-    // 2. Guardar ingredientes
-    const ingredientesValidos = ingredientes.filter(
-      (i) => i.insumo_id && i.cantidad,
+    setForm({
+      nombre: sr.nombre,
+      categoria: sr.categoria || "",
+      rinde: sr.rinde,
+      unidad_rinde: sr.unidad_rinde,
+      notas: sr.notas || "",
+    });
+    setIngredientes(
+      (data || []).map((i) => ({
+        insumo_id: i.insumo_id,
+        cantidad: i.cantidad,
+        unidad: i.unidad,
+        desperdicio: i.desperdicio ?? 0,
+        merma: i.merma ?? 0,
+      }))
     );
-    if (ingredientesValidos.length > 0) {
+    setModal(sr);
+  }
+
+  function addIngrediente() {
+    setIngredientes([...ingredientes, { ...ING_VACIO }]);
+  }
+
+  function removeIngrediente(idx) {
+    setIngredientes(ingredientes.filter((_, i) => i !== idx));
+  }
+
+  function updateIngrediente(idx, field, value) {
+    const next = [...ingredientes];
+    next[idx] = { ...next[idx], [field]: value };
+    setIngredientes(next);
+  }
+
+  async function guardar() {
+    if (!form.nombre.trim() || !form.rinde) return;
+    setGuardando(true);
+
+    const srPayload = {
+      nombre: form.nombre.trim(),
+      categoria: form.categoria.trim() || null,
+      rinde: parseFloat(form.rinde),
+      unidad_rinde: form.unidad_rinde,
+      costo_total: costoTotal,
+      costo_unitario: costoUnitario,
+      notas: form.notas.trim() || null,
+    };
+
+    let srId;
+    if (modal === "add") {
+      const { data } = await supabase.from("sub_recetas").insert(srPayload).select().single();
+      srId = data?.id;
+    } else {
+      await supabase.from("sub_recetas").update(srPayload).eq("id", modal.id);
+      srId = modal.id;
+      await supabase.from("ingredientes_sub_receta").delete().eq("sub_receta_id", srId);
+    }
+
+    const validos = ingredientes.filter((i) => i.insumo_id && i.cantidad);
+    if (validos.length > 0 && srId) {
       await supabase.from("ingredientes_sub_receta").insert(
-        ingredientesValidos.map((i) => ({
-          sub_receta_id: subReceta.id,
+        validos.map((i) => ({
+          sub_receta_id: srId,
           insumo_id: i.insumo_id,
           cantidad: parseFloat(i.cantidad),
           unidad: i.unidad,
           desperdicio: parseFloat(i.desperdicio) || 0,
           merma: parseFloat(i.merma) || 0,
-        })),
+        }))
       );
     }
 
-    // Resetear
-    setForm({
-      nombre: "",
-      categoria: "",
-      rinde: "",
-      unidad_rinde: "gr",
-      notas: "",
-    });
-    setIngredientes([]);
-    setMostrarForm(false);
+    await recalcularTodo();
+    setGuardando(false);
+    setModal(null);
+    toast(modal === "add" ? "Sub-receta creada" : "Sub-receta actualizada");
     fetchTodo();
   }
 
-  async function eliminarSubReceta(id) {
+  async function eliminar(id) {
     if (!confirm("¿Eliminar esta sub-receta?")) return;
     await supabase.from("sub_recetas").delete().eq("id", id);
+    toast("Sub-receta eliminada");
     fetchTodo();
   }
 
   return (
     <div>
-      <Title>Sub-recetas</Title>
-      <Subtitle>
-        Productos intermedios que hacés con merma — bondiola ahumada, pulled
-        pork, etc.
-      </Subtitle>
+      <PageHead>
+        <div>
+          <PageTitle>Sub-recetas</PageTitle>
+          <PageSub>Preparaciones intermedias — bondiola ahumada, pulled pork, salsas.</PageSub>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <ExportarExcel datos={subRecetas} nombreArchivo="Sub_Recetas" tipo="sub-recetas" />
+          <BtnPrimary onClick={abrirAdd}><Plus size={16} /> Nueva sub-receta</BtnPrimary>
+        </div>
+      </PageHead>
 
-      {mostrarForm && (
-        <Card>
-          <SectionTitle>Nueva sub-receta</SectionTitle>
-
-          <Grid3>
-            <FormGroup style={{ gridColumn: "1 / -1" }}>
-              <Label>Nombre</Label>
-              <Input
-                placeholder="Ej: Bondiola ahumada"
-                value={form.nombre}
-                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-              />
-            </FormGroup>
-            <FormGroup>
-              <Label>Categoría</Label>
-              <Input
-                placeholder="Opcional"
-                value={form.categoria}
-                onChange={(e) =>
-                  setForm({ ...form, categoria: e.target.value })
-                }
-              />
-            </FormGroup>
-            <FormGroup>
-              <Label>Rinde</Label>
-              <Input
-                type="number"
-                placeholder="Cuánto sale"
-                value={form.rinde}
-                onChange={(e) => setForm({ ...form, rinde: e.target.value })}
-              />
-            </FormGroup>
-            <FormGroup>
-              <Label>Unidad rinde</Label>
-              <Select
-                value={form.unidad_rinde}
-                onChange={(e) =>
-                  setForm({ ...form, unidad_rinde: e.target.value })
-                }
-              >
-                <option value="gr">gr</option>
-                <option value="kg">kg</option>
-                <option value="un">un</option>
-              </Select>
-            </FormGroup>
-            <FormGroup style={{ gridColumn: "1 / -1" }}>
-              <Label>Notas</Label>
-              <Input
-                placeholder="Opcional"
-                value={form.notas}
-                onChange={(e) => setForm({ ...form, notas: e.target.value })}
-              />
-            </FormGroup>
-          </Grid3>
-
-          <SubTitle>🧾 Ingredientes</SubTitle>
-          {ingredientes.map((ing, i) => (
-            <IngredienteRow key={i}>
-              <Select
-                value={ing.insumo_id}
-                onChange={(e) =>
-                  updateIngrediente(i, "insumo_id", e.target.value)
-                }
-              >
-                <option value="">Seleccionar insumo...</option>
-                {insumos.map((ins) => (
-                  <option key={ins.id} value={ins.id}>
-                    {ins.nombre} ({formatPrecio(ins.costo_unitario)}/
-                    {ins.unidad_medida})
-                  </option>
-                ))}
-              </Select>
-              <Input
-                type="number"
-                placeholder="Cant."
-                value={ing.cantidad}
-                onChange={(e) =>
-                  updateIngrediente(i, "cantidad", e.target.value)
-                }
-              />
-              <Select
-                value={ing.unidad}
-                onChange={(e) => updateIngrediente(i, "unidad", e.target.value)}
-              >
-                <option value="gr">gr</option>
-                <option value="kg">kg</option>
-                <option value="un">un</option>
-              </Select>
-              <Input
-                type="number"
-                placeholder="Desp. %"
-                value={ing.desperdicio}
-                onChange={(e) =>
-                  updateIngrediente(i, "desperdicio", e.target.value)
-                }
-              />
-              <Input
-                type="number"
-                placeholder="Merma %"
-                value={ing.merma}
-                onChange={(e) => updateIngrediente(i, "merma", e.target.value)}
-              />
-              <RemoveBtn onClick={() => removeIngrediente(i)}>×</RemoveBtn>
-            </IngredienteRow>
-          ))}
-
-          <ButtonSecondary
-            style={{ padding: "8px 14px", fontSize: 13, marginTop: 8 }}
-            onClick={addIngrediente}
-          >
-            + Agregar ingrediente
-          </ButtonSecondary>
-
-          {ingredientes.length > 0 && form.rinde && (
-            <ResultBox>
-              <ResultItem>
-                <ResultLabel>Costo total</ResultLabel>
-                <ResultValue>{formatPrecio(costoTotal)}</ResultValue>
-              </ResultItem>
-              <ResultItem>
-                <ResultLabel>Rinde</ResultLabel>
-                <ResultValue>
-                  {form.rinde} {form.unidad_rinde}
-                </ResultValue>
-              </ResultItem>
-              <ResultItem>
-                <ResultLabel>Costo unitario</ResultLabel>
-                <ResultValue highlight>
-                  {formatPrecio(costoUnitario)}/{form.unidad_rinde}
-                </ResultValue>
-              </ResultItem>
-            </ResultBox>
-          )}
-
-          <Row style={{ marginTop: 20 }}>
-            <Button onClick={guardarSubReceta}>💾 Guardar sub-receta</Button>
-            <ButtonSecondary
-              onClick={() => {
-                setMostrarForm(false);
-                setIngredientes([]);
-              }}
-            >
-              Cancelar
-            </ButtonSecondary>
-          </Row>
-        </Card>
-      )}
-
-      <Row style={{ marginBottom: 20 }}>
-        <SectionTitle style={{ margin: 0, border: "none", padding: 0 }}>
-          Mis sub-recetas ({subRecetas.length})
-        </SectionTitle>
-        {!mostrarForm && (
-          <Button onClick={() => setMostrarForm(true)}>
-            + Nueva sub-receta
-          </Button>
-        )}
-      </Row>
+      <Toolbar>
+        <SearchWrap>
+          <SearchIcon><Search size={14} /></SearchIcon>
+          <SearchInput
+            placeholder="Buscar sub-receta..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+          />
+        </SearchWrap>
+        <Counter>{filtrados.length} sub-receta{filtrados.length !== 1 ? "s" : ""}</Counter>
+      </Toolbar>
 
       {loading && <Empty>Cargando...</Empty>}
 
-      {!loading && subRecetas.length === 0 && (
+      {!loading && filtrados.length === 0 && (
         <Empty>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🍖</div>
-          <p>Todavía no hay sub-recetas registradas.</p>
+          <div style={{ fontSize: 44, marginBottom: 12 }}>🍖</div>
+          <p>{subRecetas.length === 0 ? "No hay sub-recetas todavía." : "No hay resultados."}</p>
         </Empty>
       )}
 
-      {subRecetas.map((sr) => (
-        <SubRecetaCard key={sr.id}>
-          <SubRecetaHeader>
-            <div>
-              <SubRecetaNombre>{sr.nombre}</SubRecetaNombre>
-              <SubRecetaDetalle>{sr.categoria}</SubRecetaDetalle>
-            </div>
-            <ButtonDanger
-              style={{ padding: "6px 12px", fontSize: 12 }}
-              onClick={() => eliminarSubReceta(sr.id)}
-            >
-              Eliminar
-            </ButtonDanger>
-          </SubRecetaHeader>
-          <SubRecetaStats>
-            <StatItem>
-              <StatLabel>Rinde</StatLabel>
-              <StatValue>
-                {sr.rinde} {sr.unidad_rinde}
-              </StatValue>
-            </StatItem>
-            <StatItem>
-              <StatLabel>Costo total</StatLabel>
-              <StatValue>{formatPrecio(sr.costo_total)}</StatValue>
-            </StatItem>
-            <StatItem>
-              <StatLabel>Costo unitario</StatLabel>
-              <StatValue highlight>
-                {formatPrecio(sr.costo_unitario)}/{sr.unidad_rinde}
-              </StatValue>
-            </StatItem>
-          </SubRecetaStats>
-          {sr.notas && (
-            <div style={{ marginTop: 10, fontSize: 13, color: "#8C7B6B" }}>
-              📝 {sr.notas}
-            </div>
-          )}
-        </SubRecetaCard>
-      ))}
+      {!loading && filtrados.length > 0 && (
+        <Table>
+          <THead>
+            <TH>Nombre</TH>
+            <TH>Categoría</TH>
+            <TH>Rinde</TH>
+            <TH>Costo total</TH>
+            <TH>Costo unitario</TH>
+            <TH />
+          </THead>
+          {filtrados.map((sr) => (
+            <TRow key={sr.id}>
+              <div>
+                <CellMain>{sr.nombre}</CellMain>
+                {sr.notas && <CellSub>{sr.notas}</CellSub>}
+              </div>
+              <div>
+                {sr.categoria ? <Pill>{sr.categoria}</Pill> : <CellSub>—</CellSub>}
+              </div>
+              <CellMain>{sr.rinde} {sr.unidad_rinde}</CellMain>
+              <CellMain>{formatPrecio(sr.costo_total)}</CellMain>
+              <Accent>{formatPrecio(sr.costo_unitario)}/{sr.unidad_rinde}</Accent>
+              <ActionsCell>
+                <IconBtn onClick={() => abrirEdit(sr)} title="Editar"><Pencil size={14} /></IconBtn>
+                <IconBtn $danger onClick={() => eliminar(sr.id)} title="Eliminar"><Trash2 size={14} /></IconBtn>
+              </ActionsCell>
+            </TRow>
+          ))}
+        </Table>
+      )}
+
+      {modal && (
+        <Overlay onClick={() => setModal(null)}>
+          <Modal onClick={(e) => e.stopPropagation()}>
+            <ModalHead>
+              <ModalTitle>{modal === "add" ? "Nueva sub-receta" : "Editar sub-receta"}</ModalTitle>
+              <IconBtn onClick={() => setModal(null)}><X size={18} /></IconBtn>
+            </ModalHead>
+
+            <FormGrid>
+              <FormGroup style={{ gridColumn: "1 / -1" }}>
+                <Label>Nombre *</Label>
+                <Input
+                  placeholder="Ej: Bondiola ahumada"
+                  value={form.nombre}
+                  onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                  autoFocus
+                />
+              </FormGroup>
+              <FormGroup>
+                <Label>Categoría</Label>
+                <Input
+                  placeholder="Opcional"
+                  value={form.categoria}
+                  onChange={(e) => setForm({ ...form, categoria: e.target.value })}
+                />
+              </FormGroup>
+              <FormGroup>
+                <Label>Rinde *</Label>
+                <Input
+                  type="number"
+                  placeholder="Ej: 700"
+                  value={form.rinde}
+                  onChange={(e) => setForm({ ...form, rinde: e.target.value })}
+                />
+              </FormGroup>
+              <FormGroup>
+                <Label>Unidad</Label>
+                <SelectInput
+                  value={form.unidad_rinde}
+                  onChange={(e) => setForm({ ...form, unidad_rinde: e.target.value })}
+                >
+                  {UNIDADES_RINDE.map((u) => <option key={u} value={u}>{u}</option>)}
+                </SelectInput>
+              </FormGroup>
+              <FormGroup style={{ gridColumn: "1 / -1" }}>
+                <Label>Notas</Label>
+                <Input
+                  placeholder="Opcional"
+                  value={form.notas}
+                  onChange={(e) => setForm({ ...form, notas: e.target.value })}
+                />
+              </FormGroup>
+            </FormGrid>
+
+            <SectionLabel>Ingredientes</SectionLabel>
+
+            {ingredientes.map((ing, i) => (
+              <IngRow key={i}>
+                <SelectInput
+                  value={ing.insumo_id}
+                  onChange={(e) => updateIngrediente(i, "insumo_id", e.target.value)}
+                >
+                  <option value="">Seleccionar insumo...</option>
+                  {insumos.map((ins) => (
+                    <option key={ins.id} value={ins.id}>
+                      {ins.nombre} ({formatPrecio(ins.costo_unitario)}/{ins.unidad_medida})
+                    </option>
+                  ))}
+                </SelectInput>
+                <Input
+                  type="number"
+                  placeholder="Cant."
+                  value={ing.cantidad}
+                  onChange={(e) => updateIngrediente(i, "cantidad", e.target.value)}
+                />
+                <SelectInput
+                  value={ing.unidad}
+                  onChange={(e) => updateIngrediente(i, "unidad", e.target.value)}
+                >
+                  {UNIDADES_RINDE.map((u) => <option key={u} value={u}>{u}</option>)}
+                </SelectInput>
+                <Input
+                  type="number"
+                  placeholder="Desp %"
+                  value={ing.desperdicio}
+                  onChange={(e) => updateIngrediente(i, "desperdicio", e.target.value)}
+                />
+                <Input
+                  type="number"
+                  placeholder="Merma %"
+                  value={ing.merma}
+                  onChange={(e) => updateIngrediente(i, "merma", e.target.value)}
+                />
+                <RemoveBtn onClick={() => removeIngrediente(i)}>
+                  <X size={14} />
+                </RemoveBtn>
+              </IngRow>
+            ))}
+
+            <AddIngBtn onClick={addIngrediente}>+ Agregar ingrediente</AddIngBtn>
+
+            {ingredientes.length > 0 && form.rinde && (
+              <CostBox>
+                <CostItem>
+                  <CostLabel>Costo total</CostLabel>
+                  <CostValue>{formatPrecio(costoTotal)}</CostValue>
+                </CostItem>
+                <CostItem>
+                  <CostLabel>Rinde</CostLabel>
+                  <CostValue>{form.rinde} {form.unidad_rinde}</CostValue>
+                </CostItem>
+                <CostItem>
+                  <CostLabel>Costo unitario</CostLabel>
+                  <CostValue $accent>{formatPrecio(costoUnitario)}/{form.unidad_rinde}</CostValue>
+                </CostItem>
+              </CostBox>
+            )}
+
+            <ModalFooter>
+              <BtnGhost onClick={() => setModal(null)}>Cancelar</BtnGhost>
+              <BtnPrimary
+                onClick={guardar}
+                disabled={guardando || !form.nombre.trim() || !form.rinde}
+              >
+                {guardando ? "Guardando..." : modal === "add" ? "Crear sub-receta" : "Guardar cambios"}
+              </BtnPrimary>
+            </ModalFooter>
+          </Modal>
+        </Overlay>
+      )}
     </div>
   );
 }

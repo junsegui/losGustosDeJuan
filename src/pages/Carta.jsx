@@ -1,675 +1,670 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import styled from "styled-components";
+import { Pencil, Trash2, Plus, Search } from "lucide-react";
 import { supabase } from "../lib/supabase";
+import { useToast } from "../components/Toast";
 import { formatPrecio } from "../lib/calculos";
 import ExportarExcel from "../components/ExportarExcel";
 
-const Title = styled.h1`
-  font-family: "DM Serif Display", serif;
-  font-size: 28px;
-  color: ${(p) => p.theme.colors.text};
-  margin-bottom: 4px;
-`;
+// ── helpers ──────────────────────────────────────────────────────────────────
 
-const Subtitle = styled.p`
-  color: ${(p) => p.theme.colors.textMuted};
-  font-size: 14px;
-  margin-bottom: 28px;
-`;
+function cmvKind(cmv) {
+  if (cmv > 70) return "danger";
+  if (cmv > 50) return "warn";
+  return "good";
+}
 
-const Card = styled.div`
-  background: ${(p) => p.theme.colors.surface};
-  border: 1px solid ${(p) => p.theme.colors.border};
-  border-radius: ${(p) => p.theme.radii.lg};
-  padding: 24px;
-  margin-bottom: 20px;
-  box-shadow: ${(p) => p.theme.shadows.sm};
-`;
+function cmvColors(cmv) {
+  if (cmv > 70) return { border: "#C62828", bg: "#FFEBEE", text: "#C62828" };
+  if (cmv > 50) return { border: "#E65100", bg: "#FFF3E0", text: "#E65100" };
+  return { border: "#2E7D32", bg: "#EDF7EE", text: "#2E7D32" };
+}
 
-const Grid = styled.div`
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 16px;
+// ── shared primitives ─────────────────────────────────────────────────────────
 
-  @media (max-width: 640px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const Grid3 = styled(Grid)`
-  grid-template-columns: 1fr 1fr 1fr;
-
-  @media (max-width: 640px) {
-    grid-template-columns: 1fr;
-  }
-`;
-
-const FormGroup = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-`;
-
-const Label = styled.label`
-  font-size: 12px;
+const FieldLabel = styled.label`
+  display: block;
+  font-size: 11.5px;
   font-weight: 600;
   color: ${(p) => p.theme.colors.textMuted};
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.05em;
+  margin-bottom: 5px;
 `;
 
 const Input = styled.input`
+  width: 100%;
   background: ${(p) => p.theme.colors.background};
   border: 1px solid ${(p) => p.theme.colors.border};
   border-radius: ${(p) => p.theme.radii.sm};
   color: ${(p) => p.theme.colors.text};
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
-  padding: 10px 14px;
+  font-family: ${(p) => p.theme.fonts.sans};
+  font-size: 13.5px;
+  padding: 9px 12px;
   outline: none;
-  transition: border-color 0.2s;
-
-  &:focus {
-    border-color: ${(p) => p.theme.colors.primary};
-  }
-
-  &::placeholder {
-    color: ${(p) => p.theme.colors.textLight};
-  }
+  transition: border-color 0.15s;
+  &:focus { border-color: ${(p) => p.theme.colors.primary}; }
+  &::placeholder { color: ${(p) => p.theme.colors.textLight}; }
 `;
 
-const Select = styled.select`
+const SelectEl = styled.select`
+  width: 100%;
   background: ${(p) => p.theme.colors.background};
   border: 1px solid ${(p) => p.theme.colors.border};
   border-radius: ${(p) => p.theme.radii.sm};
   color: ${(p) => p.theme.colors.text};
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
-  padding: 10px 14px;
+  font-family: ${(p) => p.theme.fonts.sans};
+  font-size: 13.5px;
+  padding: 9px 12px;
   outline: none;
   cursor: pointer;
-  transition: border-color 0.2s;
-
-  &:focus {
-    border-color: ${(p) => p.theme.colors.primary};
-  }
+  &:focus { border-color: ${(p) => p.theme.colors.primary}; }
 `;
 
-const Button = styled.button`
-  padding: 10px 20px;
-  border-radius: ${(p) => p.theme.radii.sm};
-  font-family: "DM Sans", sans-serif;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
+const FieldHint = styled.div`
+  font-size: 12px;
+  color: ${(p) => p.theme.colors.textMuted};
+  margin-top: 4px;
+`;
+
+const LinkBtn = styled.button`
+  background: none;
   border: none;
-  transition: all 0.15s;
-  background: ${(p) => p.theme.colors.primary};
-  color: white;
-
-  &:hover {
-    background: ${(p) => p.theme.colors.primaryHover};
-    transform: translateY(-1px);
-  }
+  padding: 0;
+  cursor: pointer;
+  color: ${(p) => p.theme.colors.primaryHover};
+  font-weight: 600;
+  font-size: inherit;
+  text-decoration: underline;
+  &:hover { opacity: 0.8; }
 `;
 
-const ButtonSecondary = styled(Button)`
-  background: ${(p) => p.theme.colors.surfaceAlt};
-  color: ${(p) => p.theme.colors.text};
-  border: 1px solid ${(p) => p.theme.colors.border};
-
-  &:hover {
-    background: ${(p) => p.theme.colors.border};
-    transform: translateY(-1px);
-  }
-`;
-
-const ButtonDanger = styled(Button)`
-  background: ${(p) => p.theme.colors.dangerLight};
-  color: ${(p) => p.theme.colors.danger};
-  border: 1px solid ${(p) => p.theme.colors.danger}33;
-
-  &:hover {
-    background: ${(p) => p.theme.colors.danger};
-    color: white;
-  }
-`;
-
-const Row = styled.div`
-  display: flex;
-  gap: 10px;
+const BtnPrimary = styled.button`
+  display: inline-flex;
   align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: ${(p) => p.theme.radii.sm};
+  border: none;
+  background: ${(p) => p.theme.colors.primary};
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: ${(p) => p.theme.fonts.sans};
+  cursor: pointer;
+  transition: background 0.12s;
+  svg { width: 14px; height: 14px; }
+  &:hover { background: ${(p) => p.theme.colors.primaryHover}; }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+`;
+
+const BtnGhost = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: ${(p) => p.theme.radii.sm};
+  border: 1px solid ${(p) => p.theme.colors.border};
+  background: ${(p) => p.theme.colors.surface};
+  color: ${(p) => p.theme.colors.text};
+  font-size: 13px;
+  font-weight: 500;
+  font-family: ${(p) => p.theme.fonts.sans};
+  cursor: pointer;
+  transition: background 0.12s;
+  svg { width: 14px; height: 14px; }
+  &:hover { background: ${(p) => p.theme.colors.surfaceHover}; }
+`;
+
+const IconBtn = styled.button`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: ${(p) => p.theme.radii.sm};
+  border: 1px solid ${(p) => p.theme.colors.border};
+  background: ${(p) => p.theme.colors.surface};
+  color: ${(p) => (p.$danger ? p.theme.colors.danger : p.theme.colors.textMuted)};
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  svg { width: 14px; height: 14px; }
+  &:hover {
+    background: ${(p) => (p.$danger ? p.theme.colors.dangerLight : p.theme.colors.surfaceHover)};
+    color: ${(p) => (p.$danger ? p.theme.colors.danger : p.theme.colors.text)};
+  }
+`;
+
+// ── layout ────────────────────────────────────────────────────────────────────
+
+const PageHead = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 20px;
+  @media (max-width: 640px) { flex-direction: column; }
+`;
+
+const PageTitle = styled.h1`
+  font-family: ${(p) => p.theme.fonts.serif};
+  font-size: 28px;
+  color: ${(p) => p.theme.colors.text};
+  margin: 0 0 4px;
+`;
+
+const PageSub = styled.div`
+  font-size: 13.5px;
+  color: ${(p) => p.theme.colors.textMuted};
+`;
+
+const Toolbar = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
 `;
 
-const SectionTitle = styled.h2`
-  font-size: 16px;
-  font-weight: 600;
-  color: ${(p) => p.theme.colors.text};
-  margin-bottom: 16px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid ${(p) => p.theme.colors.border};
-`;
-
-const Empty = styled.div`
-  text-align: center;
-  padding: 40px;
-  color: ${(p) => p.theme.colors.textMuted};
-  font-size: 14px;
-`;
-
-const ResultBox = styled.div`
-  background: ${(p) =>
-    p.bad
-      ? p.theme.colors.dangerLight
-      : p.warn
-        ? p.theme.colors.warningLight
-        : p.theme.colors.successLight};
-  border: 1px solid
-    ${(p) =>
-      p.bad
-        ? `${p.theme.colors.danger}33`
-        : p.warn
-          ? `${p.theme.colors.warning}33`
-          : `${p.theme.colors.success}33`};
-  border-radius: ${(p) => p.theme.radii.md};
-  padding: 16px 20px;
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-
-  @media (max-width: 640px) {
-    grid-template-columns: 1fr 1fr;
+const SearchWrap = styled.div`
+  position: relative;
+  flex: 1;
+  min-width: 180px;
+  max-width: 300px;
+  svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 14px;
+    height: 14px;
+    color: ${(p) => p.theme.colors.textMuted};
+    pointer-events: none;
   }
 `;
 
-const ResultItem = styled.div`
+const SearchInput = styled(Input)`
+  padding-left: 32px;
+`;
+
+const Legend = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: auto;
+  font-size: 12px;
+  color: ${(p) => p.theme.colors.textMuted};
+`;
+
+const LegendDot = styled.span`
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: ${(p) => p.$color};
+  margin-right: 4px;
+`;
+
+const CartaList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
 `;
 
-const ResultLabel = styled.span`
-  font-size: 11px;
-  color: ${(p) => p.theme.colors.textMuted};
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  font-weight: 600;
+const CartaCard = styled.div`
+  background: ${(p) => p.theme.colors.surface};
+  border: 1px solid ${(p) => p.theme.colors.border};
+  border-left: 4px solid ${(p) => p.$borderColor || p.theme.colors.border};
+  border-radius: ${(p) => p.theme.radii.md};
+  box-shadow: ${(p) => p.theme.shadows.sm};
+  overflow: hidden;
 `;
 
-const ResultValue = styled.span`
-  font-size: 18px;
-  font-weight: 700;
-  color: ${(p) =>
-    p.bad
-      ? p.theme.colors.danger
-      : p.warn
-        ? p.theme.colors.warning
-        : p.good
-          ? p.theme.colors.success
-          : p.theme.colors.text};
-`;
-
-const CartaCard = styled(Card)`
-  padding: 16px 24px;
-  margin-bottom: 10px;
-  border-left: 4px solid
-    ${(p) =>
-      p.bad
-        ? p.theme.colors.danger
-        : p.warn
-          ? p.theme.colors.warning
-          : p.theme.colors.success};
-`;
-
-const CartaHeader = styled.div`
+const CartaCardTop = styled.div`
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+  align-items: flex-start;
+  padding: 14px 18px 12px;
 `;
 
 const CartaNombre = styled.div`
-  font-weight: 600;
-  font-size: 16px;
+  font-family: ${(p) => p.theme.fonts.serif};
+  font-size: 18px;
+  color: ${(p) => p.theme.colors.text};
+  line-height: 1.2;
 `;
 
-const CartaDetalle = styled.div`
-  font-size: 13px;
+const CartaSub = styled.div`
+  font-size: 12px;
   color: ${(p) => p.theme.colors.textMuted};
-  margin-top: 2px;
+  margin-top: 3px;
 `;
 
 const CartaStats = styled.div`
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-  background: ${(p) => p.theme.colors.background};
-  border-radius: ${(p) => p.theme.radii.sm};
-  padding: 12px 16px;
+  gap: 0;
+  background: ${(p) => p.theme.colors.surfaceAlt};
+  border-top: 1px solid ${(p) => p.theme.colors.border};
 
   @media (max-width: 640px) {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
   }
 `;
 
-const StatItem = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+const StatCell = styled.div`
+  padding: 10px 14px;
+  border-right: 1px solid ${(p) => p.theme.colors.border};
+  &:last-child { border-right: none; }
 `;
 
-const StatLabel = styled.span`
-  font-size: 11px;
-  color: ${(p) => p.theme.colors.textMuted};
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-`;
-
-const StatValue = styled.span`
-  font-size: 15px;
+const StatLbl = styled.div`
+  font-size: 10.5px;
   font-weight: 600;
-  color: ${(p) =>
-    p.bad
-      ? p.theme.colors.danger
-      : p.warn
-        ? p.theme.colors.warning
-        : p.good
-          ? p.theme.colors.success
-          : p.highlight
-            ? p.theme.colors.primary
-            : p.theme.colors.text};
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: ${(p) => p.theme.colors.textMuted};
+  margin-bottom: 3px;
 `;
 
-const Overlay = styled.div`
+const StatVal = styled.div`
+  font-family: ${(p) => p.theme.fonts.mono};
+  font-variant-numeric: tabular-nums;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: ${(p) => p.$color || p.theme.colors.text};
+`;
+
+const CmvPill = styled.span`
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  background: ${(p) => p.$bg};
+  color: ${(p) => p.$color};
+  border: 1px solid ${(p) => p.$color}44;
+`;
+
+const EmptyWrap = styled.div`
+  text-align: center;
+  padding: 48px 24px;
+  color: ${(p) => p.theme.colors.textMuted};
+  font-size: 13.5px;
+`;
+
+// ── modal ─────────────────────────────────────────────────────────────────────
+
+const Backdrop = styled.div`
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.3);
-  z-index: 100;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 300;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 16px;
+  animation: fadein 0.15s;
+  @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
 `;
 
-const Modal = styled.div`
+const ModalBox = styled.div`
   background: ${(p) => p.theme.colors.surface};
   border: 1px solid ${(p) => p.theme.colors.border};
   border-radius: ${(p) => p.theme.radii.lg};
-  padding: 28px;
-  width: 100%;
-  max-width: 600px;
   box-shadow: ${(p) => p.theme.shadows.lg};
+  width: 100%;
+  max-width: 520px;
   max-height: 90vh;
   overflow-y: auto;
-
-  @media (max-width: 640px) {
-    padding: 20px 16px;
-    border-radius: ${(p) => p.theme.radii.md};
-  }
+  animation: slideup 0.15s;
+  @keyframes slideup { from { transform: translateY(16px); opacity: 0; } to { transform: none; opacity: 1; } }
 `;
 
-const ModalTitle = styled.h3`
-  font-family: "DM Serif Display", serif;
+const ModalHead = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid ${(p) => p.theme.colors.border};
+`;
+
+const ModalTitle = styled.div`
+  font-family: ${(p) => p.theme.fonts.serif};
   font-size: 20px;
-  margin-bottom: 20px;
   color: ${(p) => p.theme.colors.text};
 `;
 
-function EditModal({ item, onClose, onSaved }) {
+const ModalSub = styled.div`
+  font-size: 12.5px;
+  color: ${(p) => p.theme.colors.textMuted};
+  margin-top: 2px;
+`;
+
+const ModalBody = styled.div`
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+`;
+
+const ModalFoot = styled.div`
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 24px;
+  background: ${(p) => p.theme.colors.surfaceAlt};
+  border-top: 1px solid ${(p) => p.theme.colors.border};
+`;
+
+const Grid2 = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  @media (max-width: 480px) { grid-template-columns: 1fr; }
+`;
+
+const ResultGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+  border: 1px solid ${(p) => p.$borderColor || p.theme.colors.border};
+  border-left: 4px solid ${(p) => p.$borderColor || p.theme.colors.border};
+  border-radius: ${(p) => p.theme.radii.md};
+  overflow: hidden;
+  background: ${(p) => p.theme.colors.surfaceAlt};
+
+  @media (max-width: 480px) { grid-template-columns: 1fr 1fr; }
+`;
+
+const ResultCell = styled.div`
+  padding: 12px 14px;
+  border-right: 1px solid ${(p) => p.theme.colors.border};
+  &:last-child { border-right: none; }
+`;
+
+// ── CartaModal ────────────────────────────────────────────────────────────────
+
+function CartaModal({ item, recetas, onClose, onSaved }) {
   const [form, setForm] = useState({
-    precio_venta: item.precio_venta || "",
-    markup: item.markup || "30",
-  });
-
-  const costo = item.recetas?.costo_por_porcion || 0;
-  const precioVenta = parseFloat(form.precio_venta) || 0;
-  const cmv = precioVenta > 0 ? (costo / precioVenta) * 100 : 0;
-  const ctm = 100 - cmv;
-
-  async function guardar() {
-    if (!form.precio_venta) return alert("El precio de venta es obligatorio");
-
-    const { error } = await supabase
-      .from("carta")
-      .update({
-        precio_venta: parseFloat(form.precio_venta),
-        cmv: cmv,
-        ctm: ctm,
-        markup: parseFloat(form.markup),
-      })
-      .eq("id", item.id);
-
-    if (!error) onSaved();
-  }
-
-  return (
-    <Overlay onClick={onClose}>
-      <Modal onClick={(e) => e.stopPropagation()}>
-        <ModalTitle>Editar precio - {item.nombre_comercial}</ModalTitle>
-        <Grid>
-          <FormGroup>
-            <Label>Precio de venta ($)</Label>
-            <Input
-              type="number"
-              value={form.precio_venta}
-              onChange={(e) =>
-                setForm({ ...form, precio_venta: e.target.value })
-              }
-            />
-          </FormGroup>
-          <FormGroup>
-            <Label>Markup deseado (%)</Label>
-            <Input
-              type="number"
-              value={form.markup}
-              onChange={(e) => setForm({ ...form, markup: e.target.value })}
-            />
-          </FormGroup>
-        </Grid>
-
-        {form.precio_venta && (
-          <ResultBox bad={cmv > 70} warn={cmv > 50 && cmv <= 70}>
-            <ResultItem>
-              <ResultLabel>Costo</ResultLabel>
-              <ResultValue>{formatPrecio(costo)}</ResultValue>
-            </ResultItem>
-            <ResultItem>
-              <ResultLabel>Precio venta</ResultLabel>
-              <ResultValue highlight>{formatPrecio(precioVenta)}</ResultValue>
-            </ResultItem>
-            <ResultItem>
-              <ResultLabel>CMV</ResultLabel>
-              <ResultValue bad={cmv > 70} warn={cmv > 50 && cmv <= 70}>
-                {cmv.toFixed(1)}%
-              </ResultValue>
-            </ResultItem>
-            <ResultItem>
-              <ResultLabel>CTM</ResultLabel>
-              <ResultValue good={ctm > 50}>{ctm.toFixed(1)}%</ResultValue>
-            </ResultItem>
-          </ResultBox>
-        )}
-
-        <Row style={{ marginTop: 20 }}>
-          <Button onClick={guardar}>Guardar cambios</Button>
-          <ButtonSecondary onClick={onClose}>Cancelar</ButtonSecondary>
-        </Row>
-      </Modal>
-    </Overlay>
-  );
-}
-
-function Carta() {
-  const [carta, setCarta] = useState([]);
-  const [recetas, setRecetas] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [mostrarForm, setMostrarForm] = useState(false);
-  const [editando, setEditando] = useState(null);
-
-  const [form, setForm] = useState({
-    receta_id: "",
-    nombre_comercial: "",
-    precio_venta: "",
-    markup: "30",
+    receta_id: item?.receta_id || "",
+    nombre_comercial: item?.nombre_comercial || "",
+    precio_venta: item?.precio_venta || "",
+    markup: item?.markup || 30,
   });
 
   useEffect(() => {
-    fetchTodo();
-  }, []);
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
-  async function fetchTodo() {
-    setLoading(true);
-    const [{ data: cartaData }, { data: recetasData }] = await Promise.all([
-      supabase
-        .from("carta")
-        .select("*, recetas(*)")
-        .order("created_at", { ascending: false }),
-      supabase.from("recetas").select("*").order("nombre"),
-    ]);
-    if (cartaData) setCarta(cartaData);
-    if (recetasData) setRecetas(recetasData);
-    setLoading(false);
-  }
-
-  const recetaSeleccionada = recetas.find((r) => r.id === form.receta_id);
-  const costo = recetaSeleccionada?.costo_por_porcion || 0;
-  const precioVenta = parseFloat(form.precio_venta) || 0;
-  const cmv = precioVenta > 0 ? (costo / precioVenta) * 100 : 0;
+  const recetaSel = recetas.find((r) => r.id === form.receta_id);
+  const costo = recetaSel?.costo_por_porcion || 0;
+  const precio = parseFloat(form.precio_venta) || 0;
+  const cmv = precio > 0 ? (costo / precio) * 100 : 0;
   const ctm = 100 - cmv;
+  const sugerido = costo > 0 && form.markup > 0
+    ? costo / (1 - form.markup / 100)
+    : 0;
+  const colors = cmvColors(cmv);
 
-  async function guardarCarta() {
-    if (!form.receta_id) return alert("Seleccioná una receta");
-    if (!form.nombre_comercial.trim())
-      return alert("El nombre comercial es obligatorio");
-    if (!form.precio_venta) return alert("El precio de venta es obligatorio");
-
-    const { error } = await supabase.from("carta").insert({
+  async function guardar() {
+    if (!form.receta_id || !form.nombre_comercial.trim() || !precio) return;
+    const payload = {
       receta_id: form.receta_id,
       nombre_comercial: form.nombre_comercial,
-      precio_venta: parseFloat(form.precio_venta),
-      cmv: cmv,
-      ctm: ctm,
+      precio_venta: precio,
+      cmv,
+      ctm,
       markup: parseFloat(form.markup),
       activo: true,
-    });
-
-    if (!error) {
-      setForm({
-        receta_id: "",
-        nombre_comercial: "",
-        precio_venta: "",
-        markup: "30",
-      });
-      setMostrarForm(false);
-      fetchTodo();
+    };
+    if (item) {
+      await supabase.from("carta").update(payload).eq("id", item.id);
+    } else {
+      await supabase.from("carta").insert(payload);
     }
+    onSaved();
   }
 
-  async function eliminarCarta(id) {
-    if (!confirm("¿Eliminar de la carta?")) return;
-    await supabase.from("carta").delete().eq("id", id);
-    fetchTodo();
-  }
+  const canSave = form.receta_id && form.nombre_comercial.trim() && precio;
 
   return (
-    <div>
-      <Title>Carta</Title>
-      <Subtitle>
-        Definí el precio de venta y controlá el margen de cada producto.
-      </Subtitle>
+    <Backdrop onClick={onClose}>
+      <ModalBox onClick={(e) => e.stopPropagation()}>
+        <ModalHead>
+          <div>
+            <ModalTitle>{item ? "Editar producto" : "Agregar a la carta"}</ModalTitle>
+            <ModalSub>Mirá el CMV en vivo mientras ajustás el precio</ModalSub>
+          </div>
+          <IconBtn onClick={onClose} style={{ border: "none", background: "none" }}>✕</IconBtn>
+        </ModalHead>
 
-      {editando && (
-        <EditModal
-          item={editando}
-          onClose={() => setEditando(null)}
-          onSaved={() => {
-            setEditando(null);
-            fetchTodo();
-          }}
-        />
-      )}
+        <ModalBody>
+          <div>
+            <FieldLabel>Receta base</FieldLabel>
+            <SelectEl
+              value={form.receta_id}
+              onChange={(e) => {
+                const r = recetas.find((x) => x.id === e.target.value);
+                setForm({ ...form, receta_id: e.target.value, nombre_comercial: form.nombre_comercial || r?.nombre || "" });
+              }}
+            >
+              <option value="">Seleccionar receta…</option>
+              {recetas.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.nombre} ({formatPrecio(r.costo_por_porcion)} costo)
+                </option>
+              ))}
+            </SelectEl>
+          </div>
 
-      {mostrarForm && (
-        <Card>
-          <SectionTitle>Agregar a la carta</SectionTitle>
+          <div>
+            <FieldLabel>Nombre comercial</FieldLabel>
+            <Input
+              value={form.nombre_comercial}
+              onChange={(e) => setForm({ ...form, nombre_comercial: e.target.value })}
+              placeholder="Como aparece en la carta"
+            />
+          </div>
 
-          <Grid3>
-            <FormGroup style={{ gridColumn: "1 / -1" }}>
-              <Label>Receta</Label>
-              <Select
-                value={form.receta_id}
-                onChange={(e) => {
-                  const receta = recetas.find((r) => r.id === e.target.value);
-                  setForm({
-                    ...form,
-                    receta_id: e.target.value,
-                    nombre_comercial: receta?.nombre || "",
-                  });
-                }}
-              >
-                <option value="">Seleccionar receta...</option>
-                {recetas.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.nombre} ({formatPrecio(r.costo_por_porcion)} costo)
-                  </option>
-                ))}
-              </Select>
-            </FormGroup>
-            <FormGroup style={{ gridColumn: "1 / -1" }}>
-              <Label>Nombre comercial</Label>
-              <Input
-                placeholder="Nombre que aparece en la carta"
-                value={form.nombre_comercial}
-                onChange={(e) =>
-                  setForm({ ...form, nombre_comercial: e.target.value })
-                }
-              />
-            </FormGroup>
-            <FormGroup>
-              <Label>Precio de venta ($)</Label>
+          <Grid2>
+            <div>
+              <FieldLabel>Precio de venta ($)</FieldLabel>
               <Input
                 type="number"
-                placeholder="0"
                 value={form.precio_venta}
-                onChange={(e) =>
-                  setForm({ ...form, precio_venta: e.target.value })
-                }
+                onChange={(e) => setForm({ ...form, precio_venta: e.target.value })}
               />
-            </FormGroup>
-            <FormGroup>
-              <Label>Markup deseado (%)</Label>
+            </div>
+            <div>
+              <FieldLabel>Markup deseado (%)</FieldLabel>
               <Input
                 type="number"
-                placeholder="30"
                 value={form.markup}
                 onChange={(e) => setForm({ ...form, markup: e.target.value })}
               />
-            </FormGroup>
-          </Grid3>
+              {sugerido > 0 && Math.abs(sugerido - precio) > 1 && (
+                <FieldHint>
+                  Sugerido:{" "}
+                  <LinkBtn
+                    type="button"
+                    onClick={() => setForm({ ...form, precio_venta: Math.round(sugerido) })}
+                  >
+                    {formatPrecio(sugerido)}
+                  </LinkBtn>
+                </FieldHint>
+              )}
+            </div>
+          </Grid2>
 
-          {form.receta_id && form.precio_venta && (
-            <ResultBox bad={cmv > 70} warn={cmv > 50 && cmv <= 70}>
-              <ResultItem>
-                <ResultLabel>Costo</ResultLabel>
-                <ResultValue>{formatPrecio(costo)}</ResultValue>
-              </ResultItem>
-              <ResultItem>
-                <ResultLabel>Precio venta</ResultLabel>
-                <ResultValue highlight>{formatPrecio(precioVenta)}</ResultValue>
-              </ResultItem>
-              <ResultItem>
-                <ResultLabel>CMV</ResultLabel>
-                <ResultValue bad={cmv > 70} warn={cmv > 50 && cmv <= 70}>
-                  {cmv.toFixed(1)}%
-                </ResultValue>
-              </ResultItem>
-              <ResultItem>
-                <ResultLabel>CTM</ResultLabel>
-                <ResultValue good={ctm > 50}>{ctm.toFixed(1)}%</ResultValue>
-              </ResultItem>
-            </ResultBox>
+          {form.receta_id && precio > 0 && (
+            <ResultGrid $borderColor={colors.border}>
+              <ResultCell>
+                <StatLbl>Costo</StatLbl>
+                <StatVal>{formatPrecio(costo)}</StatVal>
+              </ResultCell>
+              <ResultCell>
+                <StatLbl>Precio</StatLbl>
+                <StatVal style={{ color: "#CF5E0E" }}>{formatPrecio(precio)}</StatVal>
+              </ResultCell>
+              <ResultCell>
+                <StatLbl>CMV</StatLbl>
+                <StatVal style={{ color: colors.text }}>{cmv.toFixed(1)}%</StatVal>
+              </ResultCell>
+              <ResultCell>
+                <StatLbl>CTM</StatLbl>
+                <StatVal>{ctm.toFixed(1)}%</StatVal>
+              </ResultCell>
+            </ResultGrid>
           )}
+        </ModalBody>
 
-          <Row style={{ marginTop: 16 }}>
-            <Button onClick={guardarCarta}>💾 Agregar a la carta</Button>
-            <ButtonSecondary onClick={() => setMostrarForm(false)}>
-              Cancelar
-            </ButtonSecondary>
-          </Row>
-        </Card>
+        <ModalFoot>
+          <BtnGhost onClick={onClose}>Cancelar</BtnGhost>
+          <BtnPrimary onClick={guardar} disabled={!canSave}>
+            {item ? "Guardar" : "Agregar"}
+          </BtnPrimary>
+        </ModalFoot>
+      </ModalBox>
+    </Backdrop>
+  );
+}
+
+// ── page ──────────────────────────────────────────────────────────────────────
+
+function Carta() {
+  const toast = useToast();
+  const [carta, setCarta] = useState([]);
+  const [recetas, setRecetas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [modal, setModal] = useState(null); // null | "add" | item
+
+  const fetchTodo = useCallback(async () => {
+    setLoading(true);
+    const [{ data: cartaData }, { data: recetasData }] = await Promise.all([
+      supabase.from("carta").select("*, recetas(*)").eq("activo", true).order("created_at", { ascending: false }),
+      supabase.from("recetas").select("*").order("nombre"),
+    ]);
+    setCarta(cartaData || []);
+    setRecetas(recetasData || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchTodo(); }, [fetchTodo]);
+
+  async function eliminar(id) {
+    if (!confirm("¿Eliminar de la carta?")) return;
+    await supabase.from("carta").delete().eq("id", id);
+    toast("Producto eliminado");
+    fetchTodo();
+  }
+
+  const filtered = carta.filter((c) =>
+    c.nombre_comercial?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div>
+      <PageHead>
+        <div>
+          <PageTitle>Carta</PageTitle>
+          <PageSub>Definí el precio de venta y controlá el margen de cada producto.</PageSub>
+        </div>
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          <ExportarExcel datos={carta} nombreArchivo="Carta_Completa" tipo="carta" />
+          <BtnPrimary onClick={() => setModal("add")}><Plus /> Agregar producto</BtnPrimary>
+        </div>
+      </PageHead>
+
+      <Toolbar>
+        <SearchWrap>
+          <Search />
+          <SearchInput
+            placeholder="Buscar producto…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </SearchWrap>
+        <Legend>
+          <span><LegendDot $color="#2E7D32" />CMV &lt; 50%</span>
+          <span><LegendDot $color="#E65100" />50–70%</span>
+          <span><LegendDot $color="#C62828" />&gt; 70%</span>
+        </Legend>
+      </Toolbar>
+
+      {loading && <EmptyWrap>Cargando…</EmptyWrap>}
+
+      {!loading && filtered.length === 0 && (
+        <EmptyWrap>
+          {search ? `Sin resultados para "${search}"` : "Todavía no hay productos en la carta."}
+        </EmptyWrap>
       )}
 
-      <Row style={{ marginBottom: 20 }}>
-        <SectionTitle style={{ margin: 0, border: "none", padding: 0 }}>
-          Mi carta ({carta.length})
-        </SectionTitle>
-        <div style={{ flex: 1 }} />
-        <ExportarExcel
-          datos={carta}
-          nombreArchivo="Carta_Completa"
-          tipo="carta"
+      <CartaList>
+        {filtered.map((c) => {
+          const cmv = c.cmv ?? 0;
+          const ctm = c.ctm ?? 0;
+          const costo = c.recetas?.costo_por_porcion ?? 0;
+          const ganancia = c.precio_venta - costo;
+          const { border, bg, text } = cmvColors(cmv);
+
+          return (
+            <CartaCard key={c.id} $borderColor={border}>
+              <CartaCardTop>
+                <div>
+                  <CartaNombre>{c.nombre_comercial}</CartaNombre>
+                  <CartaSub>
+                    Basado en: {c.recetas?.nombre || "—"} · Markup {c.markup}%
+                  </CartaSub>
+                </div>
+                <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                  <CmvPill $bg={bg} $color={text}>
+                    CMV {cmv.toFixed(1)}%
+                  </CmvPill>
+                  <IconBtn onClick={() => setModal(c)}><Pencil /></IconBtn>
+                  <IconBtn $danger onClick={() => eliminar(c.id)}><Trash2 /></IconBtn>
+                </div>
+              </CartaCardTop>
+
+              <CartaStats>
+                <StatCell>
+                  <StatLbl>Costo</StatLbl>
+                  <StatVal>{formatPrecio(costo)}</StatVal>
+                </StatCell>
+                <StatCell>
+                  <StatLbl>Precio venta</StatLbl>
+                  <StatVal $color="#CF5E0E">{formatPrecio(c.precio_venta)}</StatVal>
+                </StatCell>
+                <StatCell>
+                  <StatLbl>Ganancia</StatLbl>
+                  <StatVal $color="#2E7D32">{formatPrecio(ganancia)}</StatVal>
+                </StatCell>
+                <StatCell>
+                  <StatLbl>CMV</StatLbl>
+                  <StatVal $color={text}>{cmv.toFixed(1)}%</StatVal>
+                </StatCell>
+                <StatCell>
+                  <StatLbl>CTM</StatLbl>
+                  <StatVal $color={ctm > 50 ? "#2E7D32" : undefined}>{ctm.toFixed(1)}%</StatVal>
+                </StatCell>
+              </CartaStats>
+            </CartaCard>
+          );
+        })}
+      </CartaList>
+
+      {modal && (
+        <CartaModal
+          item={modal === "add" ? null : modal}
+          recetas={recetas}
+          onClose={() => setModal(null)}
+          onSaved={() => { setModal(null); toast(modal === "add" ? "Producto agregado a la carta" : "Producto actualizado"); fetchTodo(); }}
         />
-        {!mostrarForm && (
-          <Button onClick={() => setMostrarForm(true)}>
-            + Agregar producto
-          </Button>
-        )}
-      </Row>
-
-      {loading && <Empty>Cargando...</Empty>}
-
-      {!loading && carta.length === 0 && (
-        <Empty>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>📋</div>
-          <p>Todavía no hay productos en la carta.</p>
-        </Empty>
       )}
-
-      {carta.map((c) => {
-        const cmvVal = c.cmv || 0;
-        const ctmVal = c.ctm || 0;
-        return (
-          <CartaCard
-            key={c.id}
-            bad={cmvVal > 70}
-            warn={cmvVal > 50 && cmvVal <= 70}
-          >
-            <CartaHeader>
-              <div>
-                <CartaNombre>{c.nombre_comercial}</CartaNombre>
-                <CartaDetalle>Basado en: {c.recetas?.nombre}</CartaDetalle>
-              </div>
-              <Row>
-                <ButtonSecondary
-                  style={{ padding: "6px 12px", fontSize: 12 }}
-                  onClick={() => setEditando(c)}
-                >
-                  ✏️ Editar
-                </ButtonSecondary>
-                <ButtonDanger
-                  style={{ padding: "6px 12px", fontSize: 12 }}
-                  onClick={() => eliminarCarta(c.id)}
-                >
-                  Eliminar
-                </ButtonDanger>
-              </Row>
-            </CartaHeader>
-            <CartaStats>
-              <StatItem>
-                <StatLabel>Costo</StatLabel>
-                <StatValue>
-                  {formatPrecio(c.recetas?.costo_por_porcion)}
-                </StatValue>
-              </StatItem>
-              <StatItem>
-                <StatLabel>Precio venta</StatLabel>
-                <StatValue highlight>{formatPrecio(c.precio_venta)}</StatValue>
-              </StatItem>
-              <StatItem>
-                <StatLabel>Ganancia</StatLabel>
-                <StatValue good>
-                  {formatPrecio(
-                    c.precio_venta - (c.recetas?.costo_por_porcion || 0),
-                  )}
-                </StatValue>
-              </StatItem>
-              <StatItem>
-                <StatLabel>CMV</StatLabel>
-                <StatValue bad={cmvVal > 70} warn={cmvVal > 50 && cmvVal <= 70}>
-                  {cmvVal.toFixed(1)}%
-                </StatValue>
-              </StatItem>
-              <StatItem>
-                <StatLabel>CTM</StatLabel>
-                <StatValue good={ctmVal > 50}>{ctmVal.toFixed(1)}%</StatValue>
-              </StatItem>
-            </CartaStats>
-          </CartaCard>
-        );
-      })}
     </div>
   );
 }
